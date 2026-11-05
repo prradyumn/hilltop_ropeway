@@ -316,11 +316,17 @@ export function drawBot(b){ if(!b.visible||b.alpha<=0) return; const z=Z(); cons
     if(n>0){ const topW=[bc.x+jx+Math.sin(b.sway)*0.0, bc.y+jy-0.25];
       const its=[...b.items]; its.forEach((it,k)=>{ const im=world.itemImgs&&world.itemImgs[it]; if(!im||!im.complete) return; const [ix,iy]=toScreen(topW[0]-0.12*(its.length-1)/2+k*0.12, topW[1]-0.02); const h=z*0.2, w=h*im.naturalWidth/im.naturalHeight; ctx.drawImage(im,ix-w/2,iy-h*0.85,w,h); });
       sprA('bag_'+Math.min(4,n),'top',topW[0],topW[1]+0.04,1,rot); }
+    { const [gx,gy]=toScreen(bc.x+jx,bc.y+jy), hr=z*0.5, ha=Math.max(0.12,Math.min(1,(150-z)/80)); // soft halo: the bot reads at every zoom
+      const hg=ctx.createRadialGradient(gx,gy,hr*0.25,gx,gy,hr); hg.addColorStop(0,`rgba(255,248,220,${(0.42*ha).toFixed(3)})`); hg.addColorStop(1,'rgba(255,248,220,0)'); ctx.fillStyle=hg; circ(gx,gy,hr); ctx.fill();
+      const cp=b.mode==='rope'?[ROPE.x,wc.y]:(()=>{ const q=spanPoint(b.span,b.d); return [q.x,q.y]; })(); const [cx2,cy2]=toScreen(cp[0],cp[1]), cr=Math.max(4,z*0.14), ca=(b.v||0)>0?0.55:0.28; // wheel–cable contact glow
+      const cg=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,cr); cg.addColorStop(0,`rgba(255,226,150,${ca})`); cg.addColorStop(1,'rgba(255,226,150,0)'); ctx.fillStyle=cg; circ(cx2,cy2,cr); ctx.fill(); ctx.globalAlpha=b.alpha; }
     if(world.painted&&has('bot_face')&&pk('bot_eyes_idle')){ sprA('bot_face','center',bc.x+jx,bc.y+jy,1,rot,b.alpha); const en=eyesFor(b), im=pk(en)||pk('bot_eyes_idle'); const ew=0.4, eh=ew*im.height/im.width; const ox=-Math.sin(rot)*0.02+(b.lookX||0)*0.05, oy=Math.cos(rot)*0.02+(b.lookY||0)*0.035; // lookX/Y in -1..1: eyes glance toward what was tapped
       pimg(en,bc.x+jx+ox,bc.y+jy+oy,eh,0.5,0.5,{rot,alpha:b.alpha}); }
     else sprA(b.dim||b.blink>0?'bot_blink':'bot_body','center',bc.x+jx,bc.y+jy,1,rot,b.alpha);
     ctx.globalAlpha=b.alpha;
     if(!wheelSprite(b.wheel,wc.x+jx,wc.y+jy,b.angle,W.r,b.wheelPop)) drawWheelFace(wx,wy,W.r*z*b.wheelPop,b.angle,{groove:W.groove,band:W.band}); glossDisc(wx,wy,W.r*z*b.wheelPop);
+    { const av=Math.abs(b.angle-(b._pa??b.angle)); b._pa=b.angle; const ba=Math.max(0,Math.min(0.5,(av-0.1)*1.6)); if(ba>0.01){ const rr=W.r*z*b.wheelPop; // spokes blur into a disc at speed
+      ctx.fillStyle=`rgba(78,86,122,${ba.toFixed(3)})`; circ(wx,wy,rr*0.8); ctx.fill(); ctx.strokeStyle=`rgba(255,255,255,${(ba*0.5).toFixed(3)})`; ctx.lineWidth=Math.max(1,rr*0.06); circ(wx,wy,rr*0.5); ctx.stroke(); } }
     if(b.beacon && z<70){ ctx.strokeStyle='rgba(255,200,61,0.9)'; ctx.lineWidth=2.5; circ(bx,by-z*0.1,14+3*Math.sin(world.t*4)); ctx.stroke(); }
     ctx.globalAlpha=1; return; }
   ctx.save(); ctx.translate(bx,by); ctx.rotate(-b.sway*0.6);
@@ -380,6 +386,9 @@ const SCAT=[]; const PROCKS=[];
 (function(){ seed=99; const names=['scatter_flower_yellow','scatter_flower_coral','scatter_flower_white','scatter_flower_blue','scatter_flower_pair','scatter_flower_sprig','scatter_grass_short','scatter_grass_tall','scatter_grass_curved','scatter_pebble_round','scatter_pebble_pair','scatter_pebble_moss'];
   for(let x=-16;x<47;x+=0.55+rnd()*1.2){ if(x>-16.2&&x<1.2) { if(rnd()<0.85) continue; } if(TOWERS.some(t=>Math.abs(t.x-x)<0.9)) continue; SCAT.push({x, n:names[Math.floor(rnd()*names.length)], h:0.28+rnd()*0.22, flip:rnd()<0.5}); }
   const rn=['rock_round','rock_flat','rock_tall','rock_moss','rock_grass','rock_cluster']; for(let x=6.5;x<46;x+=4+rnd()*5){ if(TOWERS.some(t=>Math.abs(t.x-x)<1.8)||(x>38.5&&x<43.5)) continue; PROCKS.push({x, n:rn[Math.floor(rnd()*rn.length)], h:0.55+rnd()*0.5, flip:rnd()<0.5}); } })();
+const FLOWERS=[]; (function(){ seed=133; const fl=['scatter_flower_yellow','scatter_flower_coral','scatter_flower_white','scatter_flower_blue','scatter_flower_pair','scatter_flower_sprig','scatter_grass_tall','scatter_grass_curved'];
+  for(let x=3;x<45;x+=1.1+rnd()*1.8){ if(TOWERS.some(t=>Math.abs(t.x-x)<1.0)) continue; const n=1+Math.floor(rnd()*3), d0=0.8+rnd()*Math.max(1,ground(x)*0.7);
+    for(let k=0;k<n;k++) FLOWERS.push({x:x+rnd()*0.6, depth:d0+rnd()*0.5, n:fl[Math.floor(rnd()*fl.length)], h:0.22+rnd()*0.16, flip:rnd()<0.5}); } })();
 function treeName(t,salt=0){ const L=PTREE[t.kind]; return L[(Math.floor(Math.abs(t.x*7.31))+salt)%L.length]; }
 
 function drawPainted(imgs){
@@ -396,6 +405,7 @@ function drawPainted(imgs){
     pano('cloud_sea',0.7,2.3,7,g);
     COVER_PUFFS.forEach(([x,n],i)=>pimg(n,x+Math.sin(t*0.05+i*1.3)*0.6,-5.1+Math.sin(t*0.12+i)*0.12,5.2,0.5,0.5,{p:0.8,alpha:0.95,flip:i%2===1})); }
   else pano('cloud_sea',0.7,-5.5,7,PKM.cloud_sea&&PKM.cloud_sea.bottom);
+  { const g=ctx.createLinearGradient(0,0,0,world.H); g.addColorStop(0,'rgba(232,232,248,0)'); g.addColorStop(0.55,'rgba(228,230,248,0.10)'); g.addColorStop(1,'rgba(228,230,248,0.22)'); ctx.fillStyle=g; ctx.fillRect(0,0,world.W,world.H); } // depth haze: background recedes
   // 2. island
   drawIslandPainted(); drawIslandMist();
   TREES.filter(tr=>tr.back).forEach(tr=>{ const n=treeName(tr); pimg(n,tr.x,ground(tr.x)+0.05,PTH[n]*Math.min(1.15,Math.max(0.8,tr.s))*0.95,0.5,0.97,{flip:tr.v===1}); });
@@ -432,7 +442,12 @@ function drawIslandPainted(){ const z=Z();
     const [,a0]=toScreen(0,3.5), [,a1]=toScreen(0,-0.35); const ao=ctx.createLinearGradient(0,a0,0,a1); ao.addColorStop(0,'rgba(20,50,35,0)'); ao.addColorStop(1,'rgba(20,50,35,0.30)'); ctx.fillStyle=ao; ctx.fill(); }
   ctx.save(); ctx.clip();
   ctx.strokeStyle='rgba(255,255,255,0.09)'; ctx.lineWidth=z*0.5; [2.2,5.2,8.6].forEach(o=>{ smoothPath(GP.map(([x,y])=>[x,y-o])); ctx.stroke(); });
+  { const pts=[]; for(let x=1.2,k=0;x<38.5;x+=3.1,k++) pts.push([x,ground(x)-(k%2?2.5:0.95)]); // switchback footpath up the face
+    ctx.lineJoin='round'; ctx.lineCap='round'; smoothPath(pts); ctx.strokeStyle='rgba(214,188,132,0.42)'; ctx.lineWidth=Math.max(2,z*0.24); ctx.stroke(); ctx.strokeStyle='rgba(255,240,205,0.32)'; ctx.lineWidth=Math.max(1,z*0.1); ctx.stroke(); }
+  FLOWERS.forEach(f=>{ const y=ground(f.x)-f.depth; if(y<0.4) return; pimg(f.n,f.x,y,f.h,0.5,0.9,{flip:f.flip}); });
   FACE.forEach(f=>{ const y=ground(f.x)-f.depth; if(y<0.5) return; if(f.rock) pimg(['rock_moss','rock_round','rock_grass'][f.v%3],f.x,y,f.s*0.7,0.5,0.9); else { const n=treeName(f,2); pimg(n,f.x,y,PTH[n]*f.s*0.55,0.5,0.97,{flip:f.v===1}); } });
+  { const t=world.t; [[0,6.5],[1,9],[2,7.5]].forEach(([i,r])=>{ const x=((t*0.32+i*24)%72)-14, y=ground(x)*0.55; const [sx,sy]=toScreen(x,y), RR=z*r; // cloud shadows drifting across the hill
+    const g=ctx.createRadialGradient(sx,sy,0,sx,sy,RR); g.addColorStop(0,'rgba(18,40,62,0.17)'); g.addColorStop(1,'rgba(18,40,62,0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.ellipse(sx,sy,RR,RR*0.55,-0.25,0,Math.PI*2); ctx.fill(); }); }
   ctx.restore();
 }
 // island underside outline, smoothed (top edge stays straight; tips and belly curve)
@@ -482,8 +497,11 @@ function drawOperator(){ const o=world.operator; if(!o.visible) return; psheet('
 function drawKidsPainted(){ if(!world.kidsVisible) return; world.kids.forEach((k,i)=>{ if(k.alpha<=0) return; const an=(k.n<=4)?k.anim:'idle'; const fps=an==='idle'?6:10; const name=`kid_0${k.n}_${an}`;
   const [sx,sy]=toScreen(k.x+k.dx,0); const z=Z(); ctx.fillStyle='rgba(30,50,40,0.22)'; ctx.beginPath(); ctx.ellipse(sx,sy,z*0.32,z*0.07,0,0,Math.PI*2); ctx.globalAlpha=k.alpha; ctx.fill(); ctx.globalAlpha=1;
   psheet(name, world.t*fps+k.f0, k.x+k.dx, 0.02+k.dy+k.hop, 1.4, 0.5, 277/288, {alpha:k.alpha}); }); }
-function drawButterflies(){ const z=Z(); if(z<55) return; [['butterfly_coral_flap',-1.2,1.3,0],['butterfly_yellow_flap',-9.5,1.8,2.1]].forEach(([n,x,y,ph])=>{ const tt=world.t*0.7+ph; psheet(n,world.t*10,x+Math.sin(tt)*1.4,y+Math.sin(tt*2.3)*0.35,0.42,0.5,0.5,{flip:Math.cos(tt)<0}); }); }
-function drawBirds(){ const z=Z(); if(z>70) return; const T=36, tt=(world.t%T)/T; if(tt>0.55) return; const x=-20+tt/0.55*80, y=26+Math.sin(tt*9)*1.2; psheet('bird_flock_flap',world.t*8,x,y,2.2,0.5,0.5); }
+const BFLY=[['butterfly_coral_flap',-1.2,1.3,0],['butterfly_yellow_flap',-9.5,1.8,2.1],['butterfly_yellow_flap',11.6,ground(11.6)+1.0,1.3],['butterfly_coral_flap',21.2,ground(21.2)+1.1,3.7],['butterfly_yellow_flap',30.6,ground(30.6)+1.2,5.1]];
+function drawButterflies(){ const z=Z(); if(z<55) return; BFLY.forEach(([n,x,y,ph])=>{ const tt=world.t*0.7+ph; psheet(n,world.t*10,x+Math.sin(tt)*1.4,y+Math.sin(tt*2.3)*0.35,0.42,0.5,0.5,{flip:Math.cos(tt)<0}); }); }
+function drawSwallows(){ const z=Z(); if(z<70) return; const T=42, tt=(world.t%T)/T; if(tt>0.4) return; const c=world.cam, f=tt/0.4; // a small pair crosses closer views now and then
+  const x=c.x-world.W/2/z-1+f*(world.W/z+2), y=c.y+world.H*0.3/z+Math.sin(f*8)*0.25; psheet('bird_flock_flap',world.t*9,x,y,1.0,0.5,0.5); }
+function drawBirds(){ drawSwallows(); const z=Z(); if(z>70) return; const T=36, tt=(world.t%T)/T; if(tt>0.55) return; const x=-20+tt/0.55*80, y=26+Math.sin(tt*9)*1.2; psheet('bird_flock_flap',world.t*8,x,y,2.2,0.5,0.5); }
 export function addFX(name,x,y,h=1.2,o={}){ const m=PKM[name]; if(!m) return; world.fx.push({name,x,y,h,t:0,fps:o.fps||m.fps||12,frames:m.frames,ay:name==='vfx_dust_puff'?1:0.5,follow:o.follow}); }
 function drawFX(){ world.fx=world.fx.filter(f=>f.t*f.fps<f.frames); world.fx.forEach(f=>{ let x=f.x,y=f.y; if(f.follow){ const p=f.follow(); x=p[0]; y=p[1]; } psheet(f.name,f.t*f.fps,x,y,f.h,0.5,f.ay); }); }
 export function updFX(dt){ world.fx.forEach(f=>f.t+=dt); return world.fx.length>0; }

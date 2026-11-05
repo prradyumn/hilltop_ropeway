@@ -7,9 +7,12 @@ import { WebGLRenderer, Scene, PerspectiveCamera, HemisphereLight, DirectionalLi
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 const R10=0.55, R15=0.825; // lens units: 10 cm wheel radius, 15 cm wheel radius
-function ropeTexture(alongV){ const c=document.createElement('canvas'); c.width=64; c.height=64; const g=c.getContext('2d');
-  g.fillStyle='#34384A'; g.fillRect(0,0,64,64); g.strokeStyle='#5A5F78'; g.lineWidth=9;
-  for(let k=-64;k<128;k+=21){ g.beginPath(); if(alongV){ g.moveTo(0,k); g.lineTo(64,k+30); } else { g.moveTo(k,0); g.lineTo(k+30,64); } g.stroke(); }
+function ropeTexture(alongV){ // twisted 3-strand look; slope and period chosen so the texture tiles seamlessly
+  const N=128, P=32, c=document.createElement('canvas'); c.width=c.height=N; const g=c.getContext('2d'); if(!alongV) g.setTransform(0,1,1,0,0,0);
+  g.fillStyle='#2E3246'; g.fillRect(0,0,N,N); const th=Math.atan2(N/2,N), nx=-Math.sin(th), ny=Math.cos(th), w=P*Math.cos(th);
+  for(let k=-N;k<2*N;k+=P){ const gr=g.createLinearGradient(0,k,nx*w,k+ny*w); gr.addColorStop(0,'#262A3C'); gr.addColorStop(0.18,'#4C5272'); gr.addColorStop(0.5,'#7A80A2'); gr.addColorStop(0.7,'#565C7E'); gr.addColorStop(0.95,'#2A2E42');
+    g.fillStyle=gr; g.beginPath(); g.moveTo(0,k); g.lineTo(N,k+N/2); g.lineTo(N,k+N/2+P-2); g.lineTo(0,k+P-2); g.closePath(); g.fill(); }
+  g.strokeStyle='rgba(255,255,255,0.08)'; g.lineWidth=1; for(let k=-N;k<2*N;k+=P/4){ g.beginPath(); g.moveTo(0,k); g.lineTo(N,k+N/2); g.stroke(); } // fibres
   const t=new CanvasTexture(c); t.wrapS=t.wrapT=RepeatWrapping; t.colorSpace=SRGBColorSpace; return t; }
 function faceTexture(spokes=5, band=false){ const c=document.createElement('canvas'); c.width=c.height=256; const g=c.getContext('2d');
   g.fillStyle='#4A5072'; g.beginPath(); g.arc(128,128,128,0,Math.PI*2); g.fill();
@@ -37,7 +40,7 @@ export function createLens(canvas){
   const slate=new MeshStandardMaterial({color:0x4A5172,roughness:0.24,metalness:0.55,envMapIntensity:1.35}); // glossier metal (was rough .38 / metal .35)
   const coral=new MeshStandardMaterial({color:0xF0644A,roughness:0.82,envMapIntensity:0.4});
   const yellow=new MeshStandardMaterial({color:0xFFC83D,roughness:0.32,envMapIntensity:0.8});
-  const ropeTex=ropeTexture(true); const ropeMat=new MeshStandardMaterial({color:0xffffff,map:ropeTex,roughness:0.85});
+  const ropeTex=ropeTexture(true); const ropeMat=new MeshStandardMaterial({color:0xffffff,map:ropeTex,roughness:0.55,metalness:0.08,envMapIntensity:0.9});
   const faceTex=faceTexture(5), faceMat=new MeshStandardMaterial({map:faceTex,roughness:0.55});
 
   // ---------- contact rig: rope + wheel + arm + body top ----------

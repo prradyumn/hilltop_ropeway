@@ -84,11 +84,11 @@ function updFollow(dt){ if(!follow) return; const b=follow.bot, w=botWheelCenter
 /* ================= sky & light keyed to the clock ================= */
 const SKYK=[[375,'#2E3266','#E9A08C',0.30],[380,'#5F7FC0','#FFC79A',0.12],[390,'#86B7E3','#FFE6C2',0.03],[405,'#84BFEA','#E9F5FF',0],[420,'#7DBAEB','#DDF0FF',0]];
 const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)); const mix=(a,b,t)=>{ const A1=hex(a),B1=hex(b); return `rgb(${A1.map((v,i)=>Math.round(lerp(v,B1[i],t))).join(',')})`; };
-let tintA=0.3;
+let tintA=0.3, warmA=0;
 function applySky(){ const m=clamp(S.clock,375,420); let i=0; while(i<SKYK.length-2&&m>SKYK[i+1][0]) i++; const a=SKYK[i], b=SKYK[i+1]; const t=clamp((m-a[0])/(b[0]-a[0]),0,1);
   stage.style.setProperty('--skyTop',mix(a[1],b[1],t)); stage.style.setProperty('--skyBot',mix(a[2],b[2],t)); tintA=lerp(a[3],b[3],t);
   const d=clamp((m-375)/45,0,1); stage.style.setProperty('--stars',String(clamp(1-d*5,0,1))); stage.style.setProperty('--sunX',(12+d*16)+'%'); stage.style.setProperty('--sunY',(86-Math.sin(clamp((m-372)/48,0,1)*Math.PI/2)*68)+'%');
-  stage.style.setProperty('--cloudA',String(0.35+d*0.4)); world.warm=clamp(1-(m-375)/14,0,1); dirty(); }
+  stage.style.setProperty('--cloudA',String(0.35+d*0.4)); world.warm=clamp(1-(m-375)/14,0,1); warmA=m<378?0:m<392?(m-378)/14*0.14:m<406?0.14:Math.max(0.06,0.14-(m-406)/14*0.08); dirty(); }
 
 /* ================= lens ================= */
 const lensEl=$('#lens'); let lens=null; try{ lens=createLens($('#lensCanvas')); }catch(e){ lens=null; } if(!lens) lensEl.classList.add('nogl');
@@ -106,7 +106,7 @@ function paintClock(){ H.clock.querySelector('.time').textContent=fmt(S.clock); 
 const show=(el,on=true)=>el.classList.toggle('hide',!on);
 // trackLit: what the HUD shows. It lags world.lit on purpose: a tower's icon lights when its spark lands (sparkTo)
 const trackLit=[false,false,false,false]; let trackTop=false;
-function paintTracker(popIdx=-1){ const n=trackLit.filter(Boolean).length+(trackTop?1:0); H.tracker.querySelectorAll('.segs path').forEach((p,k)=>p.classList.toggle('on',k<n*2));
+function paintTracker(popIdx=-1){ const n=trackLit.filter(Boolean).length+(trackTop?1:0); H.tracker.querySelectorAll('.segs path').forEach((p,k)=>{ const was=p.classList.contains('on'), on=k<n*2; p.classList.toggle('on',on); if(on&&!was&&popIdx>=0){ p.classList.add('flash'); setTimeout(()=>p.classList.remove('flash'),180+k*40); } });
   const c=H.tracker.querySelector('.count'); c.textContent=`${n}/5`; H.tracker.querySelector('.pts b').textContent=S.points; if(popIdx>=0){ c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop'); } }
 // a spark flies (arcing) from a stage point into tracker slot idx (0-3 towers, 4 = star)
 function sparkTo(sx,sy,idx){ const n=trackLit.filter(Boolean).length+(trackTop?1:0), t=H.tracker.querySelectorAll('.segs path')[Math.min(9,n*2+1)]; /* next pair of rail segments */ if(!t) return Promise.resolve(); const R=stageRect(t); const e=html('div','spark'); e.style.left=sx+'px'; e.style.top=sy+'px'; UI.appendChild(e);
@@ -115,7 +115,7 @@ function sparkTo(sx,sy,idx){ const n=trackLit.filter(Boolean).length+(trackTop?1
     an.onfinish=()=>{ e.remove(); done(); }; return ()=>{ an.cancel(); e.remove(); }; }); }
 async function addClock(m,kind){ if(kind){ { const r=stageRect(H.clock); floatAt(kind===2?'ui_badge_2min':'ui_badge_4min',r.x+r.w/2,r.y+r.h+24); } sfx.tock(); }
   for(let i=0;i<m;i++){ S.clock++; paintClock(); await wait(90); } }
-function floatAt(n,x,y,w=150){ const e=html('img','floatimg'); e.src=A(n); e.style.left=x+'px'; e.style.top=y+'px'; e.style.width=w+'px'; e.style.marginLeft=(-w/2)+'px'; UI.appendChild(e); setTimeout(()=>e.remove(),1200); }
+function floatAt(n,x,y,w=150){ const e=html('img','floatimg'+(/^ui_badge_\d+$/.test(n)?' shine':'')); e.src=A(n); e.style.left=x+'px'; e.style.top=y+'px'; e.style.width=w+'px'; e.style.marginLeft=(-w/2)+'px'; UI.appendChild(e); setTimeout(()=>e.remove(),1200); }
 function botScreen(b=bot){ const c=botBodyCenter(b); return scr(c.x,c.y); }
 /* sunrise moment: once, the first calm beat after the clock passes 6:20 (never on top of a run or outcome sheet).
    One small soft-ray layer scaled up by the compositor; only transform/opacity animate. */
@@ -218,7 +218,7 @@ function runPhases(b,phases,speed=1){ return P(done=>{ motion={b,phases,i:0,t:0,
 function updMotion(dt){ if(!motion) return; const m=motion, d=dt*m.speed*TS.v; const ph=m.phases[m.i]; const fin=ph.up(m,d); m.t+=d;
   if(fin){ ph.end&&ph.end(m); m.i++; m.t=0; if(m.i>=m.phases.length){ motion=null; sfx.motor(false); sfx.squeal(false); m.b.jit=0; m.done(); } else { const n=m.phases[m.i]; n.start&&n.start(m); } } dirty(); }
 const PH={
-  climb:(to,v=2)=>({ start(m){ m.b.expr='focused'; }, end(m){ m.b.v=0; }, up(m,dt){ const b=m.b; b.v=v; const st=Math.min(v*dt,to-b.d); b.d+=st; b.angle+=st/R(b); sfx.motor(true,v/2); return b.d>=to-1e-6; } }),
+  climb:(to,v=2)=>({ start(m){ m.b.expr='focused'; }, end(m){ m.b.v=0; }, up(m,dt){ const b=m.b; b.v=v; const st=Math.min(v*dt,to-b.d); b.d+=st; b.angle+=st/R(b); sfx.motor(true,v/2); m.dustT=(m.dustT??0.15)-dt; if(m.dustT<=0&&v>=1){ m.dustT=0.3; cableDust(b); } return b.d>=to-1e-6; } }),
   drive:(to,v=2)=>({ end(m){ m.b.v=0; }, up(m,dt){ const b=m.b; b.v=0; const st=Math.min(v*dt,b.d-to); b.d-=st; b.angle-=st/R(b); sfx.motor(true,v/2); return b.d<=to+1e-6; } }),
   spin:(dur,slide=0)=>({ start(m){ sfx.squeal(true); drama('slip'); m.b.expr='surprised'; m.fxT=0; }, up(m,dt){ const b=m.b; m.fxT-=dt; if(m.fxT<=0){ m.fxT=0.45; sparks(b); } b.angle+=2/R(b)*dt; b.jit=0.035; sfx.motor(true,1); if(slide&&m.t>0.3) b.d=Math.max(0.05,b.d-slide*dt/(dur-0.3)); return m.t>=dur; }, end(m){ m.b.jit=0; sfx.squeal(false); } }),
   slide:(to)=>({ start(m){ m.v=0; sfx.squeal(true); kick(m.b,0.25); drama('slip'); m.b.expr='surprised'; sparks(m.b); }, up(m,dt){ const b=m.b; m.v+=3*dt; const st=Math.min(m.v*dt,b.d-to); b.d-=st; b.angle-=0.6*st/R(b); b.jit=0.02; sfx.motor(true,0.4); return b.d<=to+1e-6; }, end(m){ m.b.jit=0; sfx.squeal(false); sfx.bump(); kick(m.b,-0.3); drama('bump'); dust(m.b); } }),
@@ -229,6 +229,7 @@ const PH={
 function kick(b,a){ b.swayV+=a*3; }
 // sparks/dust skip invisible bots: the G5 ghost bot exists only for the lens, so no FX on an empty cable
 function sparks(b){ if(!b.visible) return; const W=WHEELS[b.wheel]; addFX('vfx_slip_sparks',0,0,0.9,{follow:()=>{ const w=botWheelCenter(b); if(b.mode==='rope') return [w.x+W.r,w.y]; const s=SPANS[b.span]; return [w.x-s.nx*W.r,w.y-s.ny*W.r]; }}); }
+function cableDust(b){ if(!b.visible) return; const p=b.mode==='rope'?{x:ROPE.x,y:botWheelCenter(b).y}:spanPoint(b.span,b.d); addFX('vfx_dust_puff',p.x,p.y-0.05,0.32); } // little puffs where the wheel grips
 function dust(b){ if(!b.visible) return; const c=botBodyCenter(b); addFX('vfx_dust_puff',c.x,c.y-0.35,0.9); }
 function updBots(dt){ world.bots.forEach(b=>{ if(!b.visible) return; if(!(motion&&motion.b===b)){ b.idleT=(b.idleT??3)-dt; if(b.idleT<0){ b.swayV+=0.13*(Math.random()<0.5?-1:1); b.idleT=3+Math.random()*3; } } const k=18, c=2.2; const acc=-k*b.sway - c*b.swayV; b.swayV+=acc*dt; b.sway+=b.swayV*dt; if(Math.abs(b.sway)>0.0005||Math.abs(b.swayV)>0.0005) dirty();
   b.blinkT-=dt; if(b.blinkT<0){ b.blink=0.14; b.blinkT=2.5+Math.random()*3.5; } if(b.blink>0){ b.blink-=dt; dirty(); } }); }
@@ -656,6 +657,7 @@ function frame(now){ const dt=Math.min(0.05,(now-last)/1000); if(gsap.globalTime
   if(cam.shake>0.01){ cam.shake*=Math.exp(-7*dt); dirty(); } else cam.shake=0;
   if(needDraw&&!world.hidden){ ctx.setTransform(rscale,0,0,rscale,0,0); ctx.clearRect(0,0,SW,SH); const sx=(Math.random()-0.5)*cam.shake*14, sy=(Math.random()-0.5)*cam.shake*14; ctx.translate(SW/2+sx,SH/2+sy); ctx.rotate(cam.rot||0); ctx.translate(-SW/2,-SH/2); drawWorld({flag:IMG.ui_flag,gondola:IMG.ui_gondola});
     if(tintA>0.002){ ctx.globalCompositeOperation='source-atop'; ctx.fillStyle=`rgba(46,50,110,${tintA})`; ctx.fillRect(-300,-300,SW+600,SH+600); ctx.globalCompositeOperation='source-over'; }
+    if(warmA>0.002){ ctx.globalCompositeOperation='source-atop'; const wg=ctx.createLinearGradient(0,0,SW*0.75,SH*0.35); wg.addColorStop(0,`rgba(255,184,110,${warmA.toFixed(3)})`); wg.addColorStop(1,'rgba(255,184,110,0)'); ctx.fillStyle=wg; ctx.fillRect(-300,-300,SW+600,SH+600); ctx.globalCompositeOperation='source-over'; } // morning sun from the left
     pins.forEach(placePin); needDraw=false; }
   if(lens&&lens.visible){ if(lensBot){ const b=lensBot; lens.sync({wheel:b.wheel,angle:b.angle,dist:b.d,slope:b.mode==='rope'?Math.PI/2:SPANS[b.span].ang,slip:b.jit>0?1:0}); } lens.render(dt); }
   requestAnimationFrame(frame); }

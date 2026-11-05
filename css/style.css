@@ -487,3 +487,18 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 .spk.talking{animation:talk .42s ease-in-out infinite}
 @keyframes talk{50%{rotate:-6deg;scale:1.06}}
 @media (prefers-reduced-motion: reduce){ .spk.talking{animation:none} .tapfx{display:none} }
+
+/* ---- visual upgrade pass ---- */
+/* 5: panels match the SKAI paper/sticky look: warm paper, white keyline + SKAI blue outline, a strip of tape */
+#tray,#sheet,.panel,#question,#caption .txt{background:#FFFDF6;box-shadow:0 0 0 3px #fff,0 0 0 6px rgba(0,174,239,.28),var(--shadow)}
+#sheet.glow{box-shadow:0 0 0 3px #fff,0 0 0 6px rgba(255,200,61,.9),var(--shadow)}
+#tray::before,#sheet::before,#table::before,#endcard::before{content:"";position:absolute;left:34px;top:-13px;width:84px;height:22px;margin-left:0;background:rgba(0,174,239,.5);rotate:-3deg;border-radius:3px;box-shadow:0 2px 0 rgba(0,0,0,.06);pointer-events:none}
+/* 7: success badges shine; rail segments flash as they fill */
+.floatimg.shine{animation:floatUp 1.1s cubic-bezier(.2,.8,.3,1) forwards,badgeShine 1.1s ease-out}
+@keyframes badgeShine{0%{filter:brightness(1)}22%{filter:brightness(1.55) drop-shadow(0 0 14px rgba(255,214,120,.95))}100%{filter:brightness(1)}}
+#tracker .segs path.flash{fill:#fff;fill-opacity:1;transition:none}
+/* 9: chapter title cards in SKAI style (sticky eyebrow, Fredoka name, SKAI blue rule) */
+.titlecard .tc-eb{display:inline-block;background:#FFE58A;color:#0F57A7;font:700 24px/1 var(--chakra);letter-spacing:.18em;padding:10px 18px 9px;border-radius:4px;rotate:-2deg;box-shadow:0 4px 0 rgba(0,0,0,.14);text-shadow:none}
+.titlecard .tc-name{font:400 88px/1.04 var(--fredoka);color:#fff;letter-spacing:.01em;text-shadow:0 5px 0 #0F57A7,0 18px 40px rgba(20,22,46,.45);margin-top:16px}
+.titlecard .tc-line{background:#00AEEF;height:7px}
+@media (prefers-reduced-motion: reduce){ .floatimg.shine{animation:floatUp 1.1s forwards} }
