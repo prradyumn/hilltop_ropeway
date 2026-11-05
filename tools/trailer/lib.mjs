@@ -54,7 +54,7 @@ const INIT = () => {
   };
 };
 
-export const CLEAN_CSS = `#menuBtn,#fsBtn,.tip,#menu{display:none!important} html.__nolens #lens{visibility:hidden!important}`;
+export const CLEAN_CSS = `#menuBtn,#fsBtn,.tip,#menu,#start .tapstart{display:none!important} html.__nolens #lens{visibility:hidden!important}`;
 
 export async function openGame(browser, { chapter = null, dpr = 1, css = '' } = {}) {
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: dpr, reducedMotion: 'no-preference' });

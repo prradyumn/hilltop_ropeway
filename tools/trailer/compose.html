@@ -74,9 +74,11 @@ window.drawBase=async (t,frameIdx)=>{ const sh=EDIT.shots.filter(s=>s.at<=t+1e-6
 window.renderAt=t=>{ const T=EDIT.title, N=EDIT.endcard;
   // cold open: lockup scales in (1.3 → 1, 0.3 s, overshoot), then a slow push; sub line rises in
   { const k=t-T.in, on=t>=T.in&&t<T.out; const p=clamp(k/0.3); const s=on?lerp(1.3,1,E.back(p))*(1+0.035*clamp((k-0.3)/2.5)):1;
+    if(T.lockup===false){ $('#lock').style.display='none'; } // the game's own cover carries the title
+    if(T.sub&&T.sub.cx){ $('#sub').style.right='auto'; $('#sub').style.width=(T.sub.cx*2)+'px'; $('#sub').style.top=T.sub.y+'px'; }
     $('#lock').style.opacity=on?E.out(p):0; $('#lock').style.transform=`scale(${s})`; $('#lock').style.filter=`blur(${on?(1-p)*8:0}px) drop-shadow(0 16px 24px rgba(10,14,40,.45))`;
     const q=clamp((k-T.subAt)/0.3); $('#sub').style.opacity=on?E.out(q):0; $('#sub').style.transform=`translateY(${(1-E.out(q))*24}px)`;
-    const sc=on?clamp(k/0.3)*0.55:0; $('#scrim').style.background='radial-gradient(ellipse 60% 55% at 50% 45%,rgba(20,24,64,.55),rgba(20,24,64,0) 75%)'; $('#scrim').style.opacity=sc; }
+    const sc=on&&T.lockup!==false?clamp(k/0.3)*0.55:0; $('#scrim').style.background='radial-gradient(ellipse 60% 55% at 50% 45%,rgba(20,24,64,.55),rgba(20,24,64,0) 75%)'; $('#scrim').style.opacity=sc; }
   // beat cards: slide + scale + un-blur in 0.28 s, yellow rule draws 0.08–0.3 s, gone at the cut
   for(const {c,e} of cards){ const on=t>=c.in&&t<c.out, k=t-c.in, p=clamp(k/0.28), u=clamp((k-0.08)/0.22);
     e.style.opacity=on?E.out(clamp(k/0.18)):0; e.style.transform=`translateX(${(1-E.out(p))*-60}px) scale(${lerp(0.9,1,E.back(p))})`; e.style.filter=`blur(${on?(1-p)*6:0}px)`;

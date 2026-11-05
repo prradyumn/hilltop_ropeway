@@ -7,9 +7,9 @@ const edit = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/trailer/edit.json
 const only = (() => { const i = process.argv.indexOf('--frames'); return i > 0 ? process.argv[i + 1].split(',').map(Number) : null; })();
 const N = Math.round(edit.duration * edit.fps);
 
-// cold-open plate: the game's own intro loop (1920×1200) → centre 1920×1080 frames
+// optional plate (src 'intro'): the game's intro loop (1920×1200) → centre 1920×1080 frames; the current edit opens on the live cover instead
 const intro = path.join(WORK, 'intro');
-if (!fs.existsSync(path.join(intro, 'f_00000.png'))) { fs.mkdirSync(intro, { recursive: true });
+if (edit.shots.some(s => s.src === 'intro') && !fs.existsSync(path.join(intro, 'f_00000.png'))) { fs.mkdirSync(intro, { recursive: true });
   execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', path.join(ROOT, 'assets/video/intro_loop.mp4'), '-vf', 'crop=1920:1080:0:60', '-frames:v', '200', '-start_number', '0', path.join(intro, 'f_%05d.png')]); }
 
 const META = {}; for (const s of new Set(edit.shots.flatMap(s => [s.src, s.lensFrom].filter(Boolean)))) { const f = path.join(WORK, s, 'meta.json'); if (fs.existsSync(f)) META[s] = JSON.parse(fs.readFileSync(f, 'utf8')); }

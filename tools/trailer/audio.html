@@ -5,7 +5,7 @@
 /* Offline render of the trailer soundtrack. The music bed is the game's own `mood` bed from js/sfx.js
    (Fmaj7–Dm7–B♭maj7–C7, same note() / tickNoise() recipes and timbres), re-tempo'd and laid out as a 25 s cue that adds
    layers bar by bar and resolves on F at the end card. SFX are the game's sfx.js recipes, scheduled at edit times.
-   window.renderTrailer(edit) → base64 WAV (48 kHz stereo, float → 16-bit). Loudness is normalised afterwards by ffmpeg. */
+   Hits use the game's Kenney samples (assets/sfx). window.renderTrailer(edit) → base64 WAV (48 kHz stereo, float → 16-bit). Loudness is normalised afterwards by ffmpeg. */
 const SR = 48000;
 let seed = 12345; const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
@@ -74,7 +74,18 @@ async function renderTrailer(edit) {
     squeal: (t, o) => { const osc = ac.createOscillator(); osc.type = 'triangle'; osc.frequency.value = 1900; const l = ac.createOscillator(); l.frequency.value = 13; const lg = ac.createGain(); lg.gain.value = 120; l.connect(lg); lg.connect(osc.frequency);
       const g = ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.setTargetAtTime(o.peak || 0.035, t, 0.03); g.gain.setTargetAtTime(0, t + o.d, 0.04); osc.connect(g); g.connect(sfxBus); osc.start(t); l.start(t); osc.stop(t + o.d + 0.3); l.stop(t + o.d + 0.3); },
   };
-  for (const e of edit.sfx) SFX[e.type](e.at, e);
+  /* recorded one-shots: the game's Kenney CC0 samples (assets/sfx/, same kinds + gains as js/sfx.js); synth recipes above stay for
+     whoosh / shutter / motor / squeal, which the game still synthesizes */
+  const KS = { tick: ['click_001', 'click_002', 'click_003', 'click_004', 'click_005'], select: ['select_001', 'select_002', 'select_003'], pop: ['drop_001', 'drop_002', 'drop_003', 'drop_004'],
+    clack: ['impactMetal_light_000', 'impactMetal_light_001', 'impactMetal_light_002'], bump: ['impactSoft_heavy_000'], coin: ['confirmation_001'], chime: ['glass_001', 'glass_002'],
+    tock: ['tick_002'], sting: ['jingle_STEEL02'], fanfare: ['jingle_STEEL12'], bright: ['jingle_PIZZI02'] };
+  const KG = { tick: 0.45, select: 0.55, pop: 0.55, clack: 0.6, bump: 0.75, coin: 0.5, chime: 0.6, tock: 0.55, sting: 0.6, fanfare: 0.7, bright: 0.6 };
+  const KB = {}; await Promise.all([...new Set(Object.values(KS).flat())].map(async n => { KB[n] = await ac.decodeAudioData(await (await fetch(`../../assets/sfx/${n}.mp3`)).arrayBuffer()); }));
+  const used = {};
+  const play = (kind, t, o) => { const list = KS[kind]; const n = list[(used[kind] = ((used[kind] ?? -1) + 1)) % list.length]; const src = ac.createBufferSource(); src.buffer = KB[n];
+    src.playbackRate.value = o.rate || 1; const g = ac.createGain(); g.gain.value = KG[kind] * (o.gain || 1); src.connect(g); g.connect(o.pan ? pan(o.pan, sfxBus) : sfxBus); src.start(t);
+    if (o.duckMusic) { const d = Math.pow(10, o.duckMusic / 20), e = t + KB[n].duration / (o.rate || 1); duck.gain.setValueAtTime(1, t - 0.05); duck.gain.linearRampToValueAtTime(d, t + 0.05); duck.gain.setValueAtTime(d, e - 0.2); duck.gain.linearRampToValueAtTime(1, e + 0.3); } };
+  for (const e of edit.sfx) { if (KS[e.type] && !e.synth) play(e.type, e.at, e); else SFX[e.type](e.at, e); }
 
   /* ---- VO (the game's Kokoro lines) + ducking the music bed under them ---- */
   const dk = edit.duckDb ?? -8, dg = Math.pow(10, dk / 20);
