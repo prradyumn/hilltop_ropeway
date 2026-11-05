@@ -1,0 +1,23 @@
+# Notes for coding agents
+
+Plain static site, no build step. Serve the folder (VS Code Live Server) and edit files directly.
+Target: Lenovo Tab K11 (Chrome, 1920×1200, Mali-G52). Keep frames under ~16 ms; world redraws only when something moves (30 fps cap for ambient life).
+
+- Chapters live in `js/main.js`: S1–S4 story, G1–G7 game. `play(i)` jumps; `preset(i)` sets state for a jump. The ≡ jump menu only exists with `?review` in the URL.
+- Run results come from `outcome()` (deterministic). Wheel spin is always distance ÷ radius.
+- World units: 1 su = "10 cm". Wheels r = 0.159 su (10 cm/turn) and 0.239 su (15 cm/turn). Hanging rope = 12 su (120 cm).
+- Camera: `camTo`, `camPath`, `crane` (GSAP). Nudges: `nudge(el,{tip,key})` — glow/pulse on where to tap; tips show once per session.
+
+- Audio: `sfx` one-shots play Kenney CC0 samples from `assets/sfx/` (variations + pitch jitter, synth fallback; motor/squeal/whoosh/shutter stay synthesized). Success-only stings: `sfx.sting()` tower clear, `sfx.bright()` exact prediction, `sfx.fanfare()` finale — only rising jingles (never a 'lose' sting). Captions/questions auto-narrate their recorded line (`narrate`), tap the note to replay.
+- Audio (cont.): `sfx` = one-shot sounds; `mood` (sfx.js) = synthesized ambience + music bed (`mood.bed(level)` 1–5 rises per tower lit, `mood.duck` under voice). Read-aloud: `speak(text,id)` plays `assets/voice/<id>.mp3`, falls back to browser speech.
+- Set pieces: S4 `lookCloser()` (zoom into the wheel/rope contact, story only), G5 `blueprint()`, G7 `snapPostcard()`, sunrise via `maybeSunrise()` (only at calm beats), tower clear = cable pulse + `sparkTo()` tracker.
+- UI shell = Figma "SKAI final" › entrepreneur (618:12456), assets in `assets/ui/skai/` (WebP, rebuilt transparent from the Figma layers). Exit+brand panel (tap twice → title), sound note → Replay Narration / Mute All Sounds, info note → current goal (never a hint), timer frame = clock, progress rail = checks (2 segments each) + points, hint note fixed bottom-left (close-up sits right of it, compact while choosing; G6 tray starts right of it), one tip on screen at a time, sound note also holds Full Screen, info note holds the goal + "Your guess", all CTAs use the riveted orange `.btn` plate (Fredoka One). Fonts: Fredoka One, Fredoka 700, Chakra Petch 700, Nunito.
+- Layout: 1600×1000 is the SAFE AREA, always fully visible; the stage grows to fill the window (`SW`×`SH`, `world.W/H`). Anchor UI to edges or `50%`, never hardcode 1600/1000 (use `SW`/`SH`). Check 1280×800 (K11), 1920×1080 and 1024×768.
+- Images: all WebP. Keep each about 1.2× its largest on-screen size (kid sheets 162×216 frames, HUD icons ≤128 px); `PRELOAD` decodes everything behind the title before Start.
+- Start screen plays `assets/video/intro_loop.mp4`; while it covers the stage `world.hidden` skips canvas drawing.
+
+Brief rules (don't break):
+- After a failed run: neutral replay + outcome tap only. No praise, no "try again", no auto-hint. Hints only on request (+2 min).
+- Clock: failed run +4 min, tower cleared +4, Tower 4 check run +2; on-time star if the top is cleared by 7:00.
+- Nudges point to where to tap, never to the right answer.
+- Never say the pulley "makes lifting easier"; never claim real ropeways are inspected by bots. Operator appears in story slides only.

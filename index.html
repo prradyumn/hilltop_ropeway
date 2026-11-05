@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Hilltop Ropeway</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app"><div id="stage">
+  <div id="sky"></div><div id="stars"></div><div id="sun"></div>
+  <div id="clouds"></div>
+  <canvas id="world" width="1600" height="1000"></canvas>
+  <video id="intro" muted loop playsinline preload="auto" poster="assets/video/intro_loop.webp" aria-hidden="true"></video>
+  <div id="vig"></div><div id="dim"></div><div id="flash"></div><div id="fg"></div><div class="lb" id="lbT"></div><div class="lb" id="lbB"></div>
+  <div id="lens"><canvas id="lensCanvas"></canvas><img class="fallback" alt=""><span class="tag">CLOSE-UP</span><span class="name"></span></div>
+  <div class="layer" id="pins"></div>
+  <!-- SKAI shell (Figma "SKAI final" · entrepreneur 618:12456). Timer frame 1315:5507 -->
+  <div class="hud hide" id="clock"><img class="frame" src="assets/ui/skai/skai_timer_frame.webp" alt=""><div class="tv"><span class="time">6:15</span><small>am</small></div></div>
+  <div class="hud hide" id="banner"></div>
+  <!-- Progress rail 1315:5308: frame + 10 segments (filled from the bottom, 2 per check) -->
+  <div class="hud hide" id="tracker"><img class="frame" src="assets/ui/skai/skai_rail.webp" alt=""><div class="count">0/5</div>
+    <svg class="segs" viewBox="0 0 511.81 49" preserveAspectRatio="none" aria-hidden="true"><path d="M29.9162 49H67.8101L39.8883 0H0L29.9162 49Z"/><path d="M76.9162 49H114.81L86.8883 0H47L76.9162 49Z"/><path d="M123.916 49H161.81L133.888 0H94L123.916 49Z"/><path d="M173.916 49H211.81L183.888 0H144L173.916 49Z"/><path d="M223.916 49H261.81L233.888 0H194L223.916 49Z"/><path d="M273.916 49H311.81L283.888 0H244L273.916 49Z"/><path d="M323.916 49H361.81L333.888 0H294L323.916 49Z"/><path d="M373.916 49H411.81L383.888 0H344L373.916 49Z"/><path d="M423.916 49H461.81L433.888 0H394L423.916 49Z"/><path d="M473.916 49H511.81L483.888 0H444L473.916 49Z"/></svg>
+    <div class="pts"><b>0</b> pts</div></div>
+  <div class="pill hud hide" id="notebook"><img alt=""><span></span></div>
+  <div class="hud hide" id="mission"><img class="bg" alt=""><div class="eyebrow">TODAY’S JOB</div><div class="lines"></div></div>
+  <div class="layer" id="ui"></div>
+  <!-- Exit & brand panel 1315:5432 + SKAI Space logo 618:12510 -->
+  <div class="shell" id="brand"><img class="panel-img" src="assets/ui/skai/skai_brand_panel.webp" alt=""><img class="logo" src="assets/ui/skai/skai_brand_logo.webp" alt="SKAI Space"><button id="exitBtn" aria-label="Exit"></button></div>
+  <!-- Sound note 1315:6062 + icon 618:12662, Information note 1315:6003 -->
+  <button class="shell note" id="soundBtn" aria-label="Sound and screen options" aria-expanded="false"><img class="base" src="assets/ui/skai/skai_note_sound.webp" alt=""><img class="ico" src="assets/ui/skai/skai_icon_speaker.webp" alt=""><i class="slash"></i></button>
+  <button class="shell note" id="infoBtn" aria-label="What to do" aria-expanded="false"><img class="base" src="assets/ui/skai/skai_note_info.webp" alt=""></button>
+  <!-- Sound dropdown 618:12669 -->
+  <div class="stickymenu hidden" id="soundMenu"><img class="bgimg" src="assets/ui/skai/skai_dropdown.webp" alt=""><button data-a="replay"><img src="assets/ui/skai/skai_icon_replay.webp" alt=""><span>Replay<br>Narration</span></button><button data-a="mute"><img src="assets/ui/skai/skai_icon_mute.webp" alt=""><span class="ml">Mute All<br>Sounds</span></button><button data-a="fs"><svg viewBox="0 0 56 56" width="45" height="45" fill="none" stroke="#0F57A7" stroke-linecap="round" stroke-linejoin="round"><circle cx="28" cy="28" r="25.5" stroke-width="4.5"/><path d="M17 24v-7h7M39 24v-7h-7M17 32v7h7M39 32v7h-7" stroke-width="4"/></svg><span>Full<br>Screen</span></button></div>
+  <div class="stickymenu hidden" id="infoNote"><img class="bgimg" src="assets/ui/skai/skai_dropdown.webp" alt=""><div class="txt"></div></div>
+  <button class="shell mini" id="menuBtn" aria-label="Chapters"><span></span></button>
+  <div class="panel hidden" id="menu"></div>
+</div></div>
+
+<!-- libraries -->
+<script src="js/vendor/gsap.min.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "./js/vendor/three.module.min.js",
+  "three/examples/jsm/environments/RoomEnvironment.js": "./js/vendor/RoomEnvironment.js"
+} }
+</script>
+<!-- asset list, then the game -->
+<script src="js/assets.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

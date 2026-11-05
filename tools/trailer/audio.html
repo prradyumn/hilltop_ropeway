@@ -1,0 +1,96 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Trailer audio (offline render)</title>
+<script>
+/* Offline render of the trailer soundtrack. The music bed is the game's own `mood` bed from js/sfx.js
+   (Fmaj7–Dm7–B♭maj7–C7, same note() / tickNoise() recipes and timbres), re-tempo'd and laid out as a 25 s cue that adds
+   layers bar by bar and resolves on F at the end card. SFX are the game's sfx.js recipes, scheduled at edit times.
+   window.renderTrailer(edit) → base64 WAV (48 kHz stereo, float → 16-bit). Loudness is normalised afterwards by ffmpeg. */
+const SR = 48000;
+let seed = 12345; const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+const CHORDS = [[53, 57, 60, 64], [50, 53, 57, 60], [46, 50, 53, 57], [48, 52, 55, 58]]; // Fmaj7, Dm7, Bbmaj7, C7 (from sfx.js)
+
+async function renderTrailer(edit) {
+  const DUR = edit.duration, BPM = edit.music.bpm, SPB = 60 / BPM;
+  const ac = new OfflineAudioContext(2, Math.ceil(SR * DUR), SR);
+  // buses: music (→ dry + reverb, ducked under VO), sfx, vo → master
+  const master = ac.createGain(); master.gain.value = 1; master.connect(ac.destination);
+  // music: layers → glue compressor → bus gain → duck (VO) → master
+  const musicIn = ac.createGain(); const glue = ac.createDynamicsCompressor(); glue.threshold.value = -24; glue.knee.value = 8; glue.ratio.value = 3; glue.attack.value = 0.01; glue.release.value = 0.25;
+  const musicBus = ac.createGain(); musicBus.gain.value = edit.music.gain; musicIn.connect(glue); glue.connect(musicBus); const duck = ac.createGain(); musicBus.connect(duck); duck.connect(master);
+  const MX = Object.assign({ pad: 1, pluck: 1, bass: 1, shaker: 1, bell: 1 }, edit.music.mix || {});
+  const verb = ac.createConvolver(); { const n = Math.floor(SR * 2.4), ir = ac.createBuffer(2, n, SR); for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (rnd() * 2 - 1) * Math.pow(1 - i / n, 3.2); } verb.buffer = ir; }
+  const verbGain = ac.createGain(); verbGain.gain.value = 0.28; duck.connect(verbGain); verbGain.connect(verb); verb.connect(master);
+  const sfxBus = ac.createGain(); sfxBus.gain.value = edit.sfxGain; sfxBus.connect(master); const sfxVerb = ac.createGain(); sfxVerb.gain.value = 0.15; sfxBus.connect(sfxVerb); sfxVerb.connect(verb);
+  const voBus = ac.createGain(); voBus.gain.value = edit.voGain; voBus.connect(master);
+  const pan = (p, dest) => { const s = ac.createStereoPanner(); s.pan.value = p; s.connect(dest); return s; };
+
+  /* ---- music: note() and tickNoise() exactly as in sfx.js, with a destination + pan ---- */
+  function note(m, t, dur, { type = 'sine', peak = 0.05, a = 0.02, cut = 2400, p = 0, sus = 0 } = {}) { const o = ac.createOscillator(); o.type = type; o.frequency.value = mtof(m);
+    const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut; const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); if (sus) { g.gain.exponentialRampToValueAtTime(peak * sus, t + dur * 0.72); g.gain.linearRampToValueAtTime(0, t + dur); } else g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(f); f.connect(g); g.connect(p ? pan(p, musicIn) : musicIn); o.start(t); o.stop(t + dur + 0.05); }
+  function tickNoise(t, peak, p = 0) { const b = ac.createBuffer(1, Math.ceil(SR * 0.05), SR), ch = b.getChannelData(0); for (let i = 0; i < ch.length; i++) ch[i] = (rnd() * 2 - 1) * (1 - i / ch.length);
+    const s = ac.createBufferSource(); s.buffer = b; const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 6000; const g = ac.createGain(); g.gain.value = peak; s.connect(f); f.connect(g); g.connect(p ? pan(p, musicIn) : musicIn); s.start(t); }
+  // scheduleBeat() from sfx.js; `L` = the set of layers on for this beat (pad, pluck, bass, shaker, bell)
+  function scheduleBeat(t, k, L) { const bar = Math.floor(k / 4) % CHORDS.length, b = k % 4, ch = CHORDS[bar];
+    if (L.pad && b === 0) ch.forEach((m, i) => note(m, t + i * 0.012, SPB * 5.4, { type: 'triangle', peak: 0.022 * MX.pad, sus: 0.55, a: 0.6 * SPB / 0.833, cut: 1300, p: [-.3, .3, -.15, .15][i] }));
+    if (L.pluck) { note(ch[(b * 2 + 1) % 4] + 12, t, SPB * 0.9, { type: 'triangle', peak: 0.03 * MX.pluck, a: 0.006, cut: 2600, p: -0.25 });
+      note(ch[(b * 2 + 3) % 4] + 12, t + SPB / 2, SPB * 0.8, { type: 'triangle', peak: 0.022 * MX.pluck, a: 0.006, cut: 2600, p: 0.25 }); }
+    if (L.pluck16) { note(ch[(b * 2 + 2) % 4] + 24, t + SPB / 4, SPB * 0.4, { type: 'triangle', peak: 0.012 * MX.pluck, a: 0.004, cut: 3200, p: 0.4 }); note(ch[(b * 2) % 4] + 24, t + SPB * 3 / 4, SPB * 0.4, { type: 'triangle', peak: 0.012 * MX.pluck, a: 0.004, cut: 3200, p: -0.4 }); }
+    if (L.bass && (b === 0 || b === 2)) note(ch[0] - 12, t, SPB * 1.6, { type: 'sine', peak: 0.06 * MX.bass, a: 0.01, cut: 500 });
+    if (L.shaker) { tickNoise(t + SPB / 2, 0.025 * MX.shaker, 0.2); if (b === 3) tickNoise(t + SPB * 0.75, 0.018 * MX.shaker, -0.2); }
+    if (L.bell && (b === 1 || b === 3)) note([72, 74, 77, 79, 81][(bar + b) % 5], t, SPB * 1.8, { type: 'sine', peak: 0.03 * MX.bell, a: 0.004, cut: 5000, p: b === 1 ? -0.35 : 0.35 }); }
+  const t0 = edit.music.start || 0, beats = Math.round((edit.music.resolveAt - t0) / SPB);
+  for (let k = 0; k < beats; k++) { const t = t0 + k * SPB; const L = {}; for (const [name, ranges] of Object.entries(edit.music.layers)) L[name] = ranges.some(([a, b]) => t >= a - 1e-6 && t < b - 1e-6); scheduleBeat(t, k, L); }
+  // resolve: F major (add 9) on the downbeat — pad + bass + a rising bell figure, ringing out
+  { const t = edit.music.resolveAt, ring = DUR - t + 0.2;
+    [53, 57, 60, 64, 67].forEach((m, i) => note(m, t + i * 0.012, ring + 1, { type: 'triangle', peak: 0.026 * MX.pad, sus: 0.7, a: 0.03, cut: 1600, p: [-.3, .3, -.15, .15, 0][i] }));
+    note(41, t, ring + 1, { type: 'sine', peak: 0.075 * MX.bass, a: 0.01, cut: 500 }); note(29, t, ring + 1, { type: 'sine', peak: 0.04 * MX.bass, a: 0.02, cut: 300 });
+    [72, 76, 79, 84].forEach((m, i) => note(m, t + i * SPB / 4, SPB * 3, { type: 'sine', peak: 0.034 * MX.bell, a: 0.004, cut: 5000, p: [-.3, .1, -.1, .3][i] })); }
+  // music fade-in / end fade
+  musicBus.gain.setValueAtTime(0.0001, 0); musicBus.gain.exponentialRampToValueAtTime(edit.music.gain, 0.5);
+  musicBus.gain.setValueAtTime(edit.music.gain, DUR - 0.45); musicBus.gain.linearRampToValueAtTime(0.0001, DUR);
+
+  /* ---- SFX: recipes from sfx.js (tone / noise / env), scheduled at t ---- */
+  function env(node, t0, a, d, peak, dest = sfxBus) { const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(peak, t0 + a); g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d); node.connect(g); g.connect(dest); return g; }
+  function tone(t, freq, type = 'sine', a = 0.005, d = 0.12, peak = 0.3, glide = null, p = 0) { const o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t); if (glide) o.frequency.exponentialRampToValueAtTime(glide, t + a + d); env(o, t, a, d, peak, p ? pan(p, sfxBus) : sfxBus); o.start(t); o.stop(t + a + d + 0.05); }
+  function noise(t, d = 0.08, peak = 0.2, hp = 1500, p = 0) { const b = ac.createBuffer(1, Math.ceil(SR * d), SR); const ch = b.getChannelData(0); for (let i = 0; i < ch.length; i++) ch[i] = rnd() * 2 - 1;
+    const s = ac.createBufferSource(); s.buffer = b; const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp; s.connect(f); env(f, t, 0.003, d, peak, p ? pan(p, sfxBus) : sfxBus); s.start(t); }
+  const SFX = {
+    tick: (t, o) => tone(t, 1400, 'triangle', 0.002, 0.05, 0.18, null, o.pan || 0),
+    pop: t => tone(t, 520, 'sine', 0.004, 0.1, 0.28, 880),
+    select: t => { tone(t, 880, 'triangle', 0.003, 0.07, 0.2); tone(t, 1320, 'sine', 0.003, 0.06, 0.08); },
+    clack: t => { noise(t, 0.06, 0.35, 900); tone(t, 180, 'square', 0.002, 0.06, 0.12); },
+    chime: t => { tone(t, 988, 'sine', 0.005, 0.5, 0.22); tone(t + 0.11, 1319, 'sine', 0.005, 0.6, 0.18); },
+    coin: t => { tone(t, 1046, 'square', 0.002, 0.06, 0.09); tone(t + 0.07, 1568, 'square', 0.002, 0.12, 0.09); },
+    whoosh: (t, o) => noise(t, o.d || 0.35, o.peak || 0.12, o.hp || 600, o.pan || 0),
+    bump: t => tone(t, 110, 'sine', 0.004, 0.18, 0.35, 70),
+    shutter: t => { noise(t, 0.04, 0.3, 2500); noise(t + 0.07, 0.05, 0.25, 1800); },
+    fanfare: t => [784, 988, 1175, 1568].forEach((f, i) => tone(t + i * 0.11, f, 'triangle', 0.004, 0.22, 0.16)),
+    // continuous: motor (sawtooth → lowpass 900, 70+rate*90 Hz) and squeal (triangle 1900 Hz, 13 Hz vibrato ±120) from sfx.js
+    motor: (t, o) => { const osc = ac.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 70 + (o.rate || 1) * 90; const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 900; const g = ac.createGain();
+      g.gain.setValueAtTime(0, t); g.gain.setTargetAtTime(0.06, t, 0.05); g.gain.setTargetAtTime(0, t + o.d, 0.05); osc.connect(f); f.connect(g); g.connect(sfxBus); osc.start(t); osc.stop(t + o.d + 0.4); },
+    squeal: (t, o) => { const osc = ac.createOscillator(); osc.type = 'triangle'; osc.frequency.value = 1900; const l = ac.createOscillator(); l.frequency.value = 13; const lg = ac.createGain(); lg.gain.value = 120; l.connect(lg); lg.connect(osc.frequency);
+      const g = ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.setTargetAtTime(o.peak || 0.035, t, 0.03); g.gain.setTargetAtTime(0, t + o.d, 0.04); osc.connect(g); g.connect(sfxBus); osc.start(t); l.start(t); osc.stop(t + o.d + 0.3); l.stop(t + o.d + 0.3); },
+  };
+  for (const e of edit.sfx) SFX[e.type](e.at, e);
+
+  /* ---- VO (the game's Kokoro lines) + ducking the music bed under them ---- */
+  const dk = edit.duckDb ?? -8, dg = Math.pow(10, dk / 20);
+  for (const v of edit.vo) { const buf = await ac.decodeAudioData(await (await fetch(v.file)).arrayBuffer()); const s = ac.createBufferSource(); s.buffer = buf; const vg = ac.createGain(); vg.gain.value = v.gain || 1; s.connect(vg); vg.connect(voBus); s.start(v.at);
+    const a = v.at - 0.12, b = v.at + buf.duration + 0.1; duck.gain.setValueAtTime(1, a); duck.gain.linearRampToValueAtTime(dg, a + 0.12); duck.gain.setValueAtTime(dg, b); duck.gain.linearRampToValueAtTime(1, b + 0.35); }
+
+  const out = await ac.startRendering();
+  // WAV 16-bit
+  const n = out.length, L = out.getChannelData(0), R = out.getChannelData(1), buf = new ArrayBuffer(44 + n * 4), dv = new DataView(buf);
+  const w = (o, s) => [...s].forEach((c, i) => dv.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); dv.setUint32(4, 36 + n * 4, true); w(8, 'WAVE'); w(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 2, true); dv.setUint32(24, SR, true); dv.setUint32(28, SR * 4, true); dv.setUint16(32, 4, true); dv.setUint16(34, 16, true); w(36, 'data'); dv.setUint32(40, n * 4, true);
+  let peak = 0; for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(L[i]), Math.abs(R[i]));
+  const k = peak > 0.98 ? 0.98 / peak : 1; // safety only; final level is set by loudnorm
+  for (let i = 0; i < n; i++) { dv.setInt16(44 + i * 4, Math.max(-1, Math.min(1, L[i] * k)) * 32767, true); dv.setInt16(46 + i * 4, Math.max(-1, Math.min(1, R[i] * k)) * 32767, true); }
+  let s = ''; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+  return { wav: btoa(s), peak };
+}
+window.renderTrailer = renderTrailer;
+</script>

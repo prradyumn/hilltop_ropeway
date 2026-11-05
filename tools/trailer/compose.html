@@ -1,0 +1,97 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Trailer compositor</title>
+<style>
+/* Compositor: footage frame on a canvas (with punch-in / blur), then the DOM overlay layer. Game fonts only (assets/fonts). */
+@font-face{font-family:"Fredoka One";src:url("../../assets/fonts/fredoka-one-400.woff2") format("woff2")}
+@font-face{font-family:"Nunito";font-weight:900;src:url("../../assets/fonts/nunito-900.woff2") format("woff2")}
+html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#000}
+#base{position:absolute;left:0;top:0;width:1920px;height:1080px}
+#root{position:absolute;inset:0}
+.abs{position:absolute;will-change:transform,opacity}
+.shadow{text-shadow:0 4px 0 rgba(20,26,70,.55),0 10px 28px rgba(20,26,70,.55)}
+.card{font:400 120px/1 "Fredoka One";color:#fff;white-space:nowrap;letter-spacing:.005em}
+.card i{display:block;height:9px;border-radius:5px;background:#FFC83D;margin-top:14px;transform-origin:left center;box-shadow:0 4px 0 rgba(20,26,70,.35)}
+.small{font:900 34px/1 "Nunito";color:#fff;white-space:nowrap}
+.plate{background:#fff;border-radius:16px;padding:14px 20px;box-shadow:0 6px 0 rgba(20,26,70,.18),0 14px 30px rgba(20,26,70,.35);display:flex;align-items:center}
+.plate img{display:block}
+#scrim{position:absolute;inset:0;opacity:0}
+#flash{position:absolute;inset:0;background:#fff;opacity:0}
+</style>
+<canvas id="base" width="1920" height="1080"></canvas>
+<div id="root">
+  <div id="scrim"></div>
+  <!-- cold open -->
+  <img class="abs" id="lock" src="../../assets/ui/ui_title_lockup.webp" style="width:1000px;left:460px;top:250px;opacity:0" alt="">
+  <div class="abs" id="sub" style="left:0;right:0;top:700px;display:flex;justify-content:center;align-items:center;gap:22px;opacity:0">
+    <div class="plate"><img src="../../assets/ui/skai/skai_brand_logo.webp" style="width:210px" alt=""></div><span class="small shadow" style="font-size:42px">A Grade 4 SKAI Space mission</span></div>
+  <!-- beat cards are created from the edit -->
+  <!-- cloud wipe (same art, layout and easing as the game's cloudWipe) -->
+  <div id="wipe" style="position:absolute;inset:0;overflow:hidden;display:none">
+    <img class="abs" data-k="0" src="../../assets/world/cloud_01.webp" style="width:1404px;top:-130px;left:-216px" alt="">
+    <img class="abs" data-k="1" src="../../assets/world/cloud_05.webp" style="width:1404px;top:173px;left:216px" alt="">
+    <img class="abs" data-k="2" src="../../assets/world/cloud_03.webp" style="width:1404px;top:454px;left:-324px" alt="">
+    <img class="abs" data-k="3" src="../../assets/world/cloud_06.webp" style="width:1404px;top:691px;left:324px" alt="">
+    <img class="abs" data-k="4" src="../../assets/world/cloud_02.webp" style="width:1404px;top:-22px;left:540px" alt="">
+    <img class="abs" data-k="5" src="../../assets/world/cloud_04.webp" style="width:1404px;top:330px;left:760px" alt="">
+    <img class="abs" data-k="6" src="../../assets/world/cloud_06.webp" style="width:1250px;top:120px;left:1080px" alt=""></div>
+  <!-- end card -->
+  <img class="abs" id="elock" src="../../assets/ui/ui_title_lockup.webp" style="width:960px;left:480px;top:190px;opacity:0" alt="">
+  <div class="abs card shadow" id="etag" style="left:0;right:0;top:640px;text-align:center;font-size:76px;opacity:0">Get your class up the hill.</div>
+  <div class="abs" id="elogo" style="left:0;right:0;top:800px;display:flex;justify-content:center;opacity:0"><div class="plate" style="padding:18px 28px"><img src="../../assets/ui/skai/skai_brand_logo.webp" style="width:260px" alt=""></div></div>
+  <div id="flash"></div>
+</div>
+<script>
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v)); const lerp=(a,b,t)=>a+(b-a)*t;
+const E={ out:t=>1-Math.pow(1-t,3), back:t=>{ const c=1.7,c3=c+1; return 1+c3*Math.pow(t-1,3)+c*Math.pow(t-1,2); }, io:t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2 };
+const $=s=>document.querySelector(s);
+// CSS cubic-bezier(x1,y1,x2,y2) as a function of progress (Newton + bisection on x)
+const bez=(x1,y1,x2,y2)=>t=>{ const cx=3*x1, bx=3*(x2-x1)-cx, ax=1-cx-bx, cy=3*y1, by=3*(y2-y1)-cy, ay=1-cy-by; const X=u=>((ax*u+bx)*u+cx)*u, Y=u=>((ay*u+by)*u+cy)*u;
+  let lo=0, hi=1, u=t; for(let i=0;i<30;i++){ const x=X(u); if(Math.abs(x-t)<1e-6) break; if(x<t) lo=u; else hi=u; u=(lo+hi)/2; } return Y(u); };
+const wipeEase=bez(.6,0,.2,1);
+let EDIT=null, cards=[];
+window.setup=async edit=>{ EDIT=edit;
+  for(const c of edit.cards){ const e=document.createElement('div'); e.className='abs card shadow'; e.innerHTML=`${c.text}<i></i>`; if(c.center){ e.style.left='0'; e.style.right='0'; e.style.textAlign='center'; e.style.display='flex'; e.style.flexDirection='column'; e.style.alignItems='center'; } else e.style.left=c.x+'px'; e.style.top=c.y+'px'; if(c.size) e.style.fontSize=c.size+'px'; e.style.opacity=0; $('#root').insertBefore(e,$('#flash')); cards.push({c,e}); }
+  await document.fonts.ready; await Promise.all([...document.images].map(i=>i.decode().catch(()=>{}))); return true; };
+// pose at time t (s). Every entrance is ≤ 0.3 s.
+const cv=$('#base'), cx=cv.getContext('2d'); const cache=new Map();
+const loadImg=u=>{ if(cache.has(u)) return cache.get(u); const p=new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('missing '+u)); i.src=u; }); cache.set(u,p); if(cache.size>12) cache.delete(cache.keys().next().value); return p; };
+// shot at time t → source frame; optional punch {z0,z1,x,y} (zoom about a point given as 0..1 of the frame, eased over the shot),
+// blur: px (ramps in over 0.4 s)
+window.drawBase=async (t,frameIdx)=>{ const sh=EDIT.shots.filter(s=>s.at<=t+1e-6).pop(); const next=EDIT.shots[EDIT.shots.indexOf(sh)+1]; const end=next?next.at:EDIT.duration;
+  const k=(t-sh.at)*(sh.speed||1); const fi=Math.floor((sh.in+k)*EDIT.fps+0.5+1e-6); /* consistent rounding: half-frame cut times must not duplicate/skip source frames */ const img=await loadImg(`/work/${sh.src}/f_${String(fi).padStart(5,'0')}.png`);
+  const W=img.naturalWidth, H=img.naturalHeight, d=W/1920; cx.save(); cx.filter=sh.blur?`blur(${(sh.blur*clamp((t-sh.at)/0.4)).toFixed(2)}px)`:'none'; cx.imageSmoothingQuality='high';
+  if(sh.punch){ const P=sh.punch, u=clamp((t-sh.at)/(end-sh.at)); const z=lerp(P.z0,P.z1,E.io(u)); const sw=W/z, shh=H/z; const sx=clamp(P.x*W-sw/2,0,W-sw), sy=clamp(P.y*H-shh/2,0,H-shh);
+    cx.drawImage(img,sx,sy,sw,shh,0,0,1920,1080); }
+  else cx.drawImage(img,0,0,W,H,0,0,1920,1080);
+  cx.restore();
+  // lensFrom: the close-up panel (rounded box + 6px white ring) is clipped out of the normal grab of the same instant and laid on top un-zoomed
+  if(sh.lensFrom&&window.META&&META[sh.lensFrom]){ const m=META[sh.lensFrom][fi]; if(m&&m.lens){ const L=await loadImg(`/work/${sh.lensFrom}/f_${String(fi).padStart(5,'0')}.png`);
+    const [x,y,w,h]=m.lens, k=w/(438*1.08), ring=6*1.08*k+0.5, r=26*1.08*k+ring; const path=()=>{ cx.beginPath(); cx.roundRect(x-ring,y-ring,w+2*ring,h+2*ring,r); };
+    cx.save(); path(); cx.fillStyle='#fff'; cx.shadowColor='rgba(35,40,74,.28)'; cx.shadowBlur=28*k; cx.shadowOffsetY=12*k; cx.fill(); cx.restore();
+    cx.save(); path(); cx.clip(); cx.drawImage(L,0,0,L.naturalWidth,L.naturalHeight,0,0,1920,1080); cx.restore(); } }
+  return {shot:sh.name, src:sh.src, fi}; };
+window.renderAt=t=>{ const T=EDIT.title, N=EDIT.endcard;
+  // cold open: lockup scales in (1.3 → 1, 0.3 s, overshoot), then a slow push; sub line rises in
+  { const k=t-T.in, on=t>=T.in&&t<T.out; const p=clamp(k/0.3); const s=on?lerp(1.3,1,E.back(p))*(1+0.035*clamp((k-0.3)/2.5)):1;
+    $('#lock').style.opacity=on?E.out(p):0; $('#lock').style.transform=`scale(${s})`; $('#lock').style.filter=`blur(${on?(1-p)*8:0}px) drop-shadow(0 16px 24px rgba(10,14,40,.45))`;
+    const q=clamp((k-T.subAt)/0.3); $('#sub').style.opacity=on?E.out(q):0; $('#sub').style.transform=`translateY(${(1-E.out(q))*24}px)`;
+    const sc=on?clamp(k/0.3)*0.55:0; $('#scrim').style.background='radial-gradient(ellipse 60% 55% at 50% 45%,rgba(20,24,64,.55),rgba(20,24,64,0) 75%)'; $('#scrim').style.opacity=sc; }
+  // beat cards: slide + scale + un-blur in 0.28 s, yellow rule draws 0.08–0.3 s, gone at the cut
+  for(const {c,e} of cards){ const on=t>=c.in&&t<c.out, k=t-c.in, p=clamp(k/0.28), u=clamp((k-0.08)/0.22);
+    e.style.opacity=on?E.out(clamp(k/0.18)):0; e.style.transform=`translateX(${(1-E.out(p))*-60}px) scale(${lerp(0.9,1,E.back(p))})`; e.style.filter=`blur(${on?(1-p)*6:0}px)`;
+    e.querySelector('i').style.transform=`scaleX(${E.out(u)})`; e.querySelector('i').style.width=(c.rule||220)+'px'; }
+  // cloud wipe in (the cut lands under full cover; the game's own wipe-out follows in the G7 footage)
+  if(EDIT.wipe){ const W=EDIT.wipe, el=$('#wipe'), on=t>=W.in&&t<W.outAt+0.9; el.style.display=on?'block':'none';
+    if(on) el.querySelectorAll('img').forEach(im=>{ const k=+im.dataset.k, dl=[0,.05,.1,.04,0,.07,.03][k];
+      const pin=clamp((t-W.in-dl*W.dur/0.7)/(W.dur-0.1*W.dur/0.7)), pout=clamp((t-W.outAt-dl)/0.8);
+      im.style.transform=`translateX(${((1-wipeEase(pin))*2800-wipeEase(pout)*3200)*1.08}px)`; }); }
+  // end card: white flash, navy scrim, lockup, tagline, SKAI logo (staggered, each 0.3 s)
+  { const k=t-N.in, on=t>=N.in; $('#flash').style.opacity=on?Math.max(0,0.6*(1-k/0.35)):0;
+    if(on){ $('#scrim').style.background='linear-gradient(180deg,rgba(18,22,60,.62),rgba(18,22,60,.42) 55%,rgba(18,22,60,.7))'; $('#scrim').style.opacity=E.out(clamp(k/0.3)); }
+    const a=clamp((k-0.05)/0.3), b=clamp((k-0.3)/0.3), c=clamp((k-0.5)/0.3);
+    $('#elock').style.opacity=on?E.out(a):0; $('#elock').style.transform=`scale(${on?lerp(1.25,1,E.back(a))*(1+0.025*clamp((k-0.35)/1.4)):1})`; $('#elock').style.filter=`blur(${on?(1-a)*8:0}px) drop-shadow(0 16px 24px rgba(10,14,40,.45))`;
+    $('#etag').style.opacity=on?E.out(b):0; $('#etag').style.transform=`translateY(${(1-E.out(b))*30}px)`;
+    $('#elogo').style.opacity=on?E.out(c):0; $('#elogo').style.transform=`translateY(${(1-E.out(c))*24}px)`; }
+};
+</script>
