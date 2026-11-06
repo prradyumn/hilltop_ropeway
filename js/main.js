@@ -40,7 +40,7 @@ const spare=makeBot(); spare.visible=false; spare.mode='rope'; spare.d=0; world.
 /* ================= cancellable flow primitives ================= */
 const CANCEL={cancel:true}; const pend=new Set();
 function P(setup){ return new Promise((resolve,reject)=>{ const e={reject,cleanup:null}; pend.add(e); const done=v=>{ if(!pend.has(e)) return; pend.delete(e); e.cleanup&&e.cleanup(); resolve(v); }; e.cleanup=setup(done)||null; }); }
-function abortAll(){ for(const e of [...pend]){ e.cleanup&&e.cleanup(); e.reject(CANCEL); } pend.clear(); motion=null; tweens.length=0; follow=null; rideFollow=null; sfx.stopAll(); gsap.killTweensOf(TS); gsap.killTweensOf(cam); TS.v=1; cine(false); vignette(false); clearNudges(); document.querySelectorAll('.wipe,.cpass,.titlecard,.timecard').forEach(e=>e.remove()); }
+function abortAll(){ for(const e of [...pend]){ e.cleanup&&e.cleanup(); e.reject(CANCEL); } pend.clear(); motion=null; tweens.length=0; follow=null; rideFollow=null; sfx.stopAll(); gsap.killTweensOf(TS); gsap.killTweensOf(cam); TS.v=1; cine(false); vignette(false); clearNudges(); document.querySelectorAll('.wipe,.cpass,.titlecard').forEach(e=>e.remove()); }
 const wait=ms=>P(done=>{ const id=setTimeout(done,ms); return ()=>clearTimeout(id); });
 const click=el=>P(done=>{ const h=e=>{ sfx.tick(); done(e); }; el.addEventListener('click',h); return ()=>el.removeEventListener('click',h); });
 
@@ -122,7 +122,8 @@ function botScreen(b=bot){ const c=botBodyCenter(b); return scr(c.x,c.y); }
 function maybeSunrise(){ if(S.sunrise||S.clock<380) return; S.sunrise=true; const r=html('div','rays'); $('#world').after(r); sfx.chime(); log('sunrise',{clock:fmt(S.clock)});
   const an=r.animate([{opacity:0,transform:'translate(-50%,-50%) scale(1.6) rotate(-6deg)'},{opacity:1,offset:.3},{opacity:.85,offset:.7},{opacity:0,transform:'translate(-50%,-50%) scale(2.3) rotate(8deg)'}],{duration:4200,easing:'ease-in-out'});
   an.onfinish=()=>r.remove(); }
-async function banner(eyebrow,name){ maybeSunrise(); await titleCard(eyebrow,name); H.banner.innerHTML=`<b>${eyebrow}</b>${name}`; show(H.banner,true); sfx.clack(); await wait(900); }
+// chapter title card only: the old navy banner pill that followed it was hidden again before the child could read it (declutter)
+async function banner(eyebrow,name,opt){ maybeSunrise(); await titleCard(eyebrow,name,'',opt); }
 
 /* ================= UI pieces ================= */
 function clearUI(){ clearNudges(); UI.innerHTML=''; PINS.innerHTML=''; pins.length=0; $('#dim').classList.remove('on'); }
@@ -140,9 +141,21 @@ function nudge(el,{tip=null,key=null,delay=0,round=false,place='top',ring=true,a
   el.addEventListener('click',clear,true); NG.active.push(clear); return clear; }
 function clearNudges(){ NG.active.splice(0).forEach(f=>f()); document.querySelectorAll('.tip').forEach(t=>t.remove()); }
 function clearTrayTip(){ document.querySelectorAll('.tip').forEach(t=>{ if(t.textContent.startsWith('Pick')||t.textContent.startsWith('Tap a')||t.textContent.startsWith('Tap items')) t.remove(); }); }
+/* ---------- the mission, drawn: one route used everywhere ----------
+   bot → Tower 1..4 → Top (rope + camera mount) → gondola at 7:00. Same 5 checks as the progress rail.
+   cur = the stop being worked on (-1: none, mission brief). Stops before cur are done. */
+const FIX={dir:['ui_tab_direction','Turn'],wheel:['ui_tab_wheel','Wheel'],load:['ui_tab_load','Load'],turns:['ui_one_turn','Turns']};
+function routeHTML(cur=-1){ const st=[1,2,3,4].map(n=>({ic:n-1<=cur&&cur>=0?'ui_tower_on':'ui_tower_off',l:String(n)})).concat([{ic:'ui_mount_success',l:'Top'}]);
+  let k=0; const K=()=>` style="--k:${k++}"`;
+  return `<div class="route"><span class="stop bot"${K()}>${img('ui_bot_avatar')}<b>Bot</b></span>`+
+    st.map((s,i)=>`<i class="rs ${i<cur?'done':''}"${K()}></i><span class="stop ${i<cur?'done':i===cur?'cur':''}"${K()}>${img(s.ic)}<b>${s.l}</b></span>`).join('')+
+    `<i class="rs"${K()}></i><span class="stop ride"${K()}>${img('ui_gondola')}<b>7:00</b></span></div>`; }
+const fixHTML=(keys,lead='YOU FIX')=>`<div class="fixes"><small>${lead}</small>${keys.map(k=>`<span>${img(FIX[k][0])}<b>${FIX[k][1]}</b></span>`).join('')}</div>`;
 /* ---------- cinematic chapter card ---------- */
-async function titleCard(eyebrow,name,sub=''){ const c=html('div','titlecard',`<div class="tc-eb">${eyebrow}</div><div class="tc-name">${name}</div>${sub?`<div class="tc-sub">${sub}</div>`:''}<i class="tc-line"></i>`); UI.appendChild(c); sfx.whoosh();
-  await wait(1700); c.classList.add('out'); await wait(450); c.remove(); }
+// route: where this chapter sits on the mission route; fix: the one thing the child changes here (named, never the answer)
+async function titleCard(eyebrow,name,sub='',{route=null,fix=null,lead}={}){ const map=route!==null;
+  const c=html('div','titlecard'+(map?' map':''),`<div class="tc-eb">${eyebrow}</div><div class="tc-name">${name}</div>${sub?`<div class="tc-sub">${sub}</div>`:''}${map?`<div class="tc-map">${routeHTML(route)}${fix?fixHTML(fix,lead):''}</div>`:'<i class="tc-line"></i>'}`); UI.appendChild(c); sfx.whoosh();
+  await wait(map?2900:1700); c.classList.add('out'); await wait(450); c.remove(); }
 function cloudPass(){ const w=html('div','cpass'); ['cloud_04','cloud_01','cloud_06'].forEach((n,i)=>{ const im=new Image(); im.src=(window.PACK&&window.PACK[n])||''; im.className='cp c'+i; w.appendChild(im); }); stage.appendChild(w); setTimeout(()=>w.remove(),2600); }
 /* ---------- cloud wipe transition ---------- */
 async function cloudWipe(mid){ const w=html('div','wipe'); ['cloud_01','cloud_05','cloud_03','cloud_06','cloud_02'].forEach((n,i)=>{ const im=new Image(); im.src=(window.PACK&&window.PACK[n])||''; im.className='wc w'+i; w.appendChild(im); }); stage.appendChild(w); sfx.whoosh();
@@ -152,7 +165,10 @@ const VO={'6:15 am. Your class is first in line.':'s1_queue','No ride until the 
   'This is the inspection bot. It came with a smooth wheel.':'s2_bot','Will it reach the top tower?':'s3_q','Tap the big wheel.':'s4_tapwheel',
   'The wheel turns. The rope moves with it.':'s4_turns','Now tap the bot.':'s4_tapbot','Same kind of wheel. Watch it on the bot.':'s4_same',
   'In the bot, what stays still?':'s4_q','The rope stays still, so the wheel moves itself along it.':'s4_rope','Pulley. A wheel with a groove that guides a rope.':'s4_pulley',
-  'How many turns to the flag?':'g4_q','Which sentence is true?':'g5_q','Grip is what stops the slipping.':'g5_end',
+  'How many turns to the flag?':'g4_q','The flag is 80 cm up. How many turns?':'g4_q80','The flag is 90 cm up. How many turns?':'g4_q90','Turn the wheel. How far does the bot go?':'g4_watch',
+  'Which way should the wheel turn?':'g1_q','Steeper cable. Which wheel will get the bot up?':'g2_q','What should the bot carry today?':'g3_q','Set up the new bot to climb the rope.':'g6_q',
+  'Tower 1 checked. The way the wheel turns sets which way the bot goes.':'f_t1','Tower 2 checked. On the steep cable, the grooved wheel with a band did not slip.':'f_t2',
+  'Tower 3 checked. With only the camera, the bot was light enough to climb.':'f_t3','Tower 4 checked. Each turn moves the bot the distance around its wheel. The bigger wheel goes farther.':'f_t4','Which sentence is true?':'g5_q','Grip is what stops the slipping.':'g5_end',
   'At Tower 2, the big smooth wheel slipped too.':'g5_bigslip','At Tower 2, the wheel was already spinning fast. It still slipped.':'g5_fastslip',
   'Watch which way the top of the wheel moves.':'h_g1','Look at where the wheel touches the cable.':'h_g2','Read the mission card again.':'h_g3','How far does one turn go?':'h_g4','Check all three: turn, wheel, load.':'h_g6'};
 let voEl=null, lastLine='';
@@ -166,11 +182,13 @@ function speak(t,id){ t=t.replace(/<[^>]+>/g,'').trim(); const key=id||VO[t]; tr
   const a=new Audio(`assets/voice/${key}.mp3`); voEl=a; mood.duck(true); const talk=on=>document.querySelectorAll('#caption .spk,#question .spk').forEach(e=>e.classList.toggle('talking',on)); talk(true);
   a.onended=()=>{ talk(false); if(voEl===a){ voEl=null; mood.duck(false); } }; a.onpause=()=>talk(false); a.onerror=()=>{ if(voEl===a){ voEl=null; fallback(); } };
   a.play().catch(()=>{ if(voEl===a){ voEl=null; fallback(); } }); }
-function caption(text,{next=true}={}){ lastLine=text; narrate(text); const old=$('#caption'); if(old) old.remove(); const c=html('div','fade'); c.id='caption';
-  c.innerHTML=`<div class="txt"><button class="spk" aria-label="Read aloud">${img('skai_icon_speaker')}</button><span>${text}</span></div>`+(next?`<button class="btn next" aria-label="Next">NEXT</button>`:'');
+// found: an icon of what worked at this tower + a FOUND stamp, so the finding is something to look at, not only to read
+function caption(text,{next=true,found=null}={}){ lastLine=text; narrate(text); const old=$('#caption'); if(old) old.remove(); const c=html('div','fade'+(found?' found':'')); c.id='caption';
+  c.innerHTML=`<div class="txt">${found?`<span class="fnd">${img(found)}<b>FOUND</b></span>`:''}<button class="spk" aria-label="Read aloud">${img('skai_icon_speaker')}</button><span>${text}</span></div>`+(next?`<button class="btn next" aria-label="Next">NEXT</button>`:'');
   c.querySelector('.spk').onclick=()=>speak(text.replace(/<[^>]+>/g,'')); UI.appendChild(c); return c; }
-async function say(text){ const c=caption(text); const nb=c.querySelector('.next'); nudge(nb,{tip:'Tap to continue',key:'next',delay:1600}); await click(nb); c.remove(); }
-function question(text){ lastLine=text; narrate(text); const old=$('#question'); if(old) old.remove(); const q=html('div','fade'); q.id='question'; q.innerHTML=`<button class="spk" aria-label="Read aloud">${img('skai_icon_speaker')}</button><span>${text}</span>`; q.querySelector('.spk').onclick=()=>speak(text); UI.appendChild(q); return q; }
+async function say(text,opt={}){ const c=caption(text,opt); const nb=c.querySelector('.next'); nudge(nb,{tip:'Tap to continue',key:'next',delay:1600}); await click(nb); c.remove(); }
+// voice:false = re-show a step's question after a run without reading it out again
+function question(text,{voice=true}={}){ lastLine=text; if(voice) narrate(text); const old=$('#question'); if(old) old.remove(); const q=html('div','fade'); q.id='question'; q.innerHTML=`<button class="spk" aria-label="Read aloud">${img('skai_icon_speaker')}</button><span>${text}</span>`; q.querySelector('.spk').onclick=()=>speak(text); UI.appendChild(q); return q; }
 const rmq=()=>{ const q=$('#question'); if(q) q.remove(); };
 
 // projected pins
@@ -278,8 +296,7 @@ async function S1(){ S.chapter='S1';
   await wait(500); st.remove();
   const fly=camPath([{x:27,y:16,zoom:22,rot:-0.05,d:2.8,ease:'power2.inOut'},{x:9,y:5.5,zoom:46,rot:0.035,d:2.2,ease:'sine.inOut'},{...V.station,rot:0,d:1.8,ease:'power3.out'}]);
   setTimeout(()=>cloudPass(),900);
-  await fly; cine(false);
-  const tc=html('div','timecard',`<div class="t">6:15<small>am</small></div><div class="s">Hilltop Ropeway · Lower Station</div>`); UI.appendChild(tc); sfx.chime(); await wait(1900); tc.classList.add('out'); await wait(500); tc.remove();
+  await fly; cine(false); sfx.chime(); // (the "6:15 am" timecard is gone: the first caption says the same thing)
   show(H.clock,true); paintClock();
   await say('6:15 am. Your class is first in line.');
   await camTo(V.gate,1.2); world.operator.anim='point';
@@ -288,7 +305,26 @@ async function S1(){ S.chapter='S1';
   const cp=camPath([...TOWERS.map((t,i)=>({x:t.x+0.8,y:t.y-0.5,zoom:64,rot:-SPANS[i].ang*0.14,d:i?1.25:1.7,ease:i?'sine.inOut':'power2.in'})),{...V.towers,rot:0,d:2.0,ease:'power3.out'}]);
   for(let i=0;i<4;i++){ await wait(i?1250:1600); world.lampFlash[i]=1; dirty(); sfx.tick(); setTimeout(()=>{ world.lampFlash[i]=0; dirty(); },300); }
   await cp; cine(false); await say('Four towers. Each one steeper.');
+  await missionBrief();
 }
+/* The problem statement, said once in full before anything else happens: what to get done, what the child controls, what it costs.
+   The progress rail and the clock light up beside the line they belong to, so the HUD reads as "the mission" from here on. */
+const MISSION_VO='Your mission: get the bot to the top. Check four towers and the rope at the top. You set its turn, its wheel and its load. The first ride is at 7:00. A failed run costs 4 minutes.';
+async function missionBrief(){ paintTracker(); show(H.tracker,true);
+  const m=html('div','panel fade'); m.id='brief';
+  // mostly pictures: the route (what to get done), three icons (what you fix), one cost line. The voice reads it all.
+  m.innerHTML=`<div class="eb">YOUR MISSION</div><h2>Get the bot to the top by 7:00</h2>${routeHTML(-1)}
+    <div class="row2">${fixHTML(['dir','wheel','load'])}<div class="cost">${img('ui_badge_4min')}<span>A failed run<br>costs 4 minutes</span></div></div>
+    <div class="ft"><button class="spk" aria-label="Read aloud">${img('skai_icon_speaker')}</button><button class="btn" id="briefGo">${START_LABEL}</button></div>`;
+  m.querySelector('.spk').onclick=()=>speak(MISSION_VO,'s1_mission'); UI.appendChild(m); lastLine=MISSION_VO; if(ac_ok()) setTimeout(()=>speak(MISSION_VO,'s1_mission'),250);
+  // the pieces arrive in step with the voice; the rail and the clock glow when their part is said (attention only)
+  setTimeout(()=>H.tracker.classList.add('attn'),2200);
+  setTimeout(()=>{ H.tracker.classList.remove('attn'); m.classList.add('s2'); },4600);
+  setTimeout(()=>{ m.classList.add('s3'); H.clock.classList.add('attn'); },8200);
+  setTimeout(()=>H.clock.classList.remove('attn'),11000);
+  const go=m.querySelector('#briefGo'); nudge(go,{delay:11500});
+  try{ await click(go); } finally { H.tracker.classList.remove('attn'); H.clock.classList.remove('attn'); m.remove(); }
+  log('mission_brief_read'); }
 // fade the intro video out; the world is drawn again underneath while it fades, then the video stops decoding
 function introOff(){ const iv=$('#intro'); world.hidden=false; dirty(); if(!iv||!iv.classList.contains('on')) return; iv.classList.remove('on'); setTimeout(()=>{ if(!iv.classList.contains('on')) iv.pause(); },900); }
 async function S2(){ S.chapter='S2'; world.kidsBob=false;
@@ -344,41 +380,48 @@ async function S4(){ S.chapter='S4';
   [P1,P2,P3,q1,q2].forEach(unpin);
   bot.d=d0(0); dirty();
 }
-/* S4 "look closer": one continuous push from the hill into the wheel-on-rope contact, with a scale ruler (1 m → 10 cm → 1 cm).
+/* S4 "look closer": one continuous push from the hill into the wheel-on-rope contact.
+   (The 1 m → 10 cm → 1 cm scale ruler was removed: scale is not what this beat teaches, the still rope under a turning wheel is.)
    Story-only (never during a failed replay: that would point at the cause). Lens goes full-stage, animated by transform only. */
 async function lookCloser(b){ const back={x:cam.x,y:cam.y,zoom:cam.zoom,rot:cam.rot||0}, w=botWheelCenter(b);
-  const ru=html('div','scaleRuler',['1 m','10 cm','1 cm'].map((l,i)=>`<span data-i="${i}">${l}</span>`).join('')+'<i class="mk"></i>'); UI.appendChild(ru);
-  const step=i=>{ ru.querySelectorAll('span').forEach(s=>s.classList.toggle('on',+s.dataset.i===i)); ru.querySelector('.mk').style.transform=`translateY(${i*58}px)`; sfx.tick(); };
-  step(0); cine(true); sfx.whoosh(); const t10=setTimeout(()=>step(1),900);
+  cine(true); sfx.whoosh();
   try{
     await camTo({x:w.x,y:w.y+0.02,zoom:620,rot:0},1.7,'power3.in');
     if(lens){ lensEl.querySelector('.name').textContent=WNAME[b.wheel]; lensEl.querySelector('.fallback').src=A(WPROF[b.wheel]);
       lensEl.classList.add('full','on'); lens.size(SW,SH,Math.min(1.25,rscale)); lensBot=b; lens.macro=0; lens.show('contact'); flash(0.5);
       const corner=`translate(126px,${SH-32-274}px) scale(${438/SW},${274/SH})`; // the small close-up box, in full-stage terms
       const grow=lensEl.animate([{transform:corner},{transform:'none'}],{duration:650,easing:'cubic-bezier(.6,0,.2,1)'}); await P(done=>{ grow.onfinish=done; return ()=>grow.cancel(); });
-      gsap.to(lens,{macro:1,duration:2.6,ease:'power2.inOut'}); setTimeout(()=>step(2),1300);
+      gsap.to(lens,{macro:1,duration:2.6,ease:'power2.inOut'});
       await runPhases(b,[PH.climb(b.d+0.45,0.22)]); await wait(700);
       gsap.to(lens,{macro:0,duration:0.7,ease:'power2.in'});
       const shrink=lensEl.animate([{transform:'none'},{transform:corner,opacity:0}],{duration:600,easing:'cubic-bezier(.6,0,.4,1)',fill:'forwards'}); await P(done=>{ shrink.onfinish=done; return ()=>shrink.cancel(); });
       lensEl.classList.remove('full'); lensHide(); shrink.cancel(); } // hold the end frame until 'on' is off, so nothing pops back for a frame
-    else { await wait(1800); step(2); await wait(800); }
+    else { await wait(2600); }
     await camTo(back,1.2,'power2.inOut');
-  } finally { clearTimeout(t10); ru.remove(); cine(false); lensEl.classList.remove('full'); b.expr='idle'; dirty(); }
+  } finally { cine(false); lensEl.classList.remove('full'); b.expr='idle'; dirty(); }
 }
 async function G1(){ S.chapter='G1'; S.dir=null; S.hintText='Watch which way the top of the wheel moves.'; S.changedBeforeFirst=false;
   world.operator.visible=false; // brief: operator appears in story slides only (preset() covers menu jumps, this covers play-through)
-  show(H.tracker,true); paintTracker(); await crane(segView(0),2.4); await banner('TOWER 1','GENTLE SLOPE');
+  show(H.tracker,true); paintTracker(); await crane(segView(0),2.4); await banner('TOWER 1','GENTLE SLOPE',{route:0,fix:['dir']});
   const setup=()=>({dir:S.dir,wheel:bot.wheel,items:new Set()});
   const tr=tray({ options:[{id:'cw',icon:'ui_turn_cw',aria:'Clockwise'},{id:'ccw',icon:'ui_turn_ccw',aria:'Anticlockwise'}], selected:S.dir, onPick:v=>{ S.dir=v; log('setting_changed',{tower:1,variable:'dir',to:v}); runState(true,true); clearTrayTip(); } });
-  runState(true,!!S.dir); nudge(tr.el.querySelector('.row'),{tip:'Pick which way the wheel turns',key:'tray-dir',delay:500});
-  await towerLoop(1,setup,()=>{ tr.show(); runState(true,!!S.dir); });
+  runState(true,!!S.dir); nudge(tr.el.querySelector('.row'),{delay:500}); // glow only: the question above already says what to do
+  await towerLoop(1,setup,()=>{ tr.show(); runState(true,!!S.dir); },{ ask:'Which way should the wheel turn?', found:FOUND[1] });
   tr.remove();
 }
-async function towerLoop(tw,getSetup,reopen,{onSuccess}={}){
+/* ask: the step's question, on screen while the child sets up (read aloud the first time only, gone during the run).
+   found: what this tower showed, said once after it is cleared, in the child's terms. It reports what happened, never the
+   general rule: the rule is the child's to pick in Say the Rule. */
+// [line, icon of what worked]
+const FOUND={1:['Tower 1 checked. The way the wheel turns sets which way the bot goes.','ui_tab_direction'],
+  2:['Tower 2 checked. On the steep cable, the grooved wheel with a band did not slip.','ui_wheel_band'],
+  3:['Tower 3 checked. With only the camera, the bot was light enough to climb.','ui_item_camera'],
+  4:['Tower 4 checked. Each turn moves the bot the distance around its wheel. The bigger wheel goes farther.','ui_one_turn']};
+async function towerLoop(tw,getSetup,reopen,{onSuccess,ask,found}={}){
   let run=0, prev=null;
   while(true){
-    reopen(); show(H.banner,false); maybeSunrise();
-    await click(runBtn); const s=getSetup(); run++;
+    reopen(); show(H.banner,false); maybeSunrise(); if(ask) question(ask,{voice:run===0});
+    await click(runBtn); rmq(); const s=getSetup(); run++;
     const same=prev&&JSON.stringify([s.dir,s.wheel,[...s.items].sort()])===JSON.stringify([prev.dir,prev.wheel,[...prev.items].sort()]);
     log('run_started',{tower:tw,run,setup:{dir:s.dir,wheel:s.wheel,items:[...s.items]},same_as_previous:!!same,anticipated:run===1&&S.changedBeforeFirst});
     const {o,actual}=await performRun(bot,tw,s);
@@ -387,7 +430,7 @@ async function towerLoop(tw,getSetup,reopen,{onSuccess}={}){
     else { if(o.type==='climbed'&&!o.jobDone){ /* camera missing */ const [x,y]=botScreen(); floatAt('ui_glyph_film',x,y-70,90); } await addClock(4,4); }
     lensHide(); await wait(400);
     await outcomeSheet(actual,{tower:tw,run});
-    if(success){ await addClock(4); return {run}; }
+    if(success){ await addClock(4); if(found) await say(found[0],{found:found[1]}); return {run}; }
     // neutral replay
     await replay(tw,s); prev=s;
   }
@@ -399,30 +442,30 @@ async function replay(tw,s){ bot.d=d0(bot.span); dirty(); const tag=html('div','
   await resetBot(bot); await camTo(segView(bot.span),0.8);
 }
 async function G2(){ S.chapter='G2'; S.hintText='Look at where the wheel touches the cable.'; S.changedBeforeFirst=false;
-  bot.d=SPANS[0].len-0.32; placeBotSpan(bot,1); await crane(segView(1),2.4); await banner('TOWER 2','STEEP SLOPE');
+  bot.d=SPANS[0].len-0.32; placeBotSpan(bot,1); await crane(segView(1),2.4); await banner('TOWER 2','STEEP SLOPE',{route:1,fix:['wheel']});
   let firstRunDone=false;
   const opts=[{id:'smooth',icon:'ui_wheel_smooth',badge:'ui_profile_smooth',label:'Smooth'},{id:'big_smooth',icon:'ui_wheel_big_smooth',badge:'ui_profile_big_smooth',label:'Big smooth'},{id:'grooved',icon:'ui_wheel_grooved',badge:'ui_profile_grooved',label:'Grooved'},{id:'band',icon:'ui_wheel_band',badge:'ui_profile_band',label:'Grooved + band'}];
   const tr=tray({ options:opts, selected:bot.wheel, carry:`${img('ui_turn_cw')}Turn kept from Tower 1`, onPick:async v=>{ if(!firstRunDone) S.changedBeforeFirst=true; log('setting_changed',{tower:2,variable:'wheel',from:bot.wheel,to:v,anticipated:!firstRunDone});
     await swapWheel(bot,v); lensShow('idle',WNAME[v],WPROF[v]); } });
-  lensShow('idle',WNAME[bot.wheel],WPROF[bot.wheel]); lensBot=bot; nudge(tr.el,{ring:false,tip:'Tap a wheel to swap it',key:'tray-wheel',delay:600}); // on the tray, not the row: keeps the "Turn kept" line readable
-  await towerLoop(2,()=>{ firstRunDone=true; return {dir:S.dir||'cw',wheel:bot.wheel,items:new Set()}; },()=>{ tr.show(); runState(true,true); lensBot=bot; lensShow('idle',WNAME[bot.wheel],WPROF[bot.wheel]); });
+  lensShow('idle',WNAME[bot.wheel],WPROF[bot.wheel]); lensBot=bot; // no tray tip: the question above says what to do
+  await towerLoop(2,()=>{ firstRunDone=true; return {dir:S.dir||'cw',wheel:bot.wheel,items:new Set()}; },()=>{ tr.show(); runState(true,true); lensBot=bot; lensShow('idle',WNAME[bot.wheel],WPROF[bot.wheel]); },{ ask:'Steeper cable. Which wheel will get the bot up?', found:FOUND[2] });
   tr.remove(); lensHide();
 }
 async function swapWheel(b,v){ sfx.pop(); await tween(b,{wheelPop:0.01},0.16,ease.in); b.wheel=v; await tween(b,{wheelPop:1},0.3,ease.out); kick(b,0.2); sfx.clack(); }
 const ITEMS=[{id:'camera',icon:'ui_item_camera',label:'Camera'},{id:'lamp',icon:'ui_item_lamp',label:'Lamp'},{id:'toolbox',icon:'ui_item_toolbox',label:'Toolbox'},{id:'battery',icon:'ui_item_battery',label:'Spare battery'}];
 function missionCard(done=false){ H.mission.querySelector('.lines').innerHTML=`<div class="ln ${done?'done':''}" id="jobLine">${img('ui_glyph_film')}<span>Film the cable.</span><i class="tick"></i></div><div class="ln">${img('ui_glyph_sunrise')}<span>Sunrise: 6:20</span></div><div class="ln">${img('ui_glyph_battery')}<span>Battery: full</span></div>`; }
 async function G3(){ S.chapter='G3'; S.hintText='Read the mission card again.'; S.changedBeforeFirst=false;
-  placeBotSpan(bot,2); bot.items=new Set(['camera','lamp','toolbox','battery']); await crane(segView(2,135),2.4); await banner('TOWER 3','STEEPER, WITH LOAD');
+  placeBotSpan(bot,2); bot.items=new Set(['camera','lamp','toolbox','battery']); await crane(segView(2,135),2.4); await banner('TOWER 3','STEEPER, WITH LOAD',{route:2,fix:['load']});
   missionCard(false); show(H.mission,true); sfx.pop(); H.mission.classList.add('attn'); setTimeout(()=>H.mission.classList.remove('attn'),2600);
   let firstRunDone=false;
-  const tr=tray({ options:ITEMS, selected:[...bot.items], multi:true, onPick:v=>{ if(!firstRunDone) S.changedBeforeFirst=true; bot.items=v; kick(bot,0.25); dirty(); log('setting_changed',{tower:3,variable:'load',items:[...v],anticipated:!firstRunDone}); } }); nudge(tr.el.querySelector('.row'),{ring:false,tip:'Tap items to pack or unpack',key:'tray-load',delay:700});
-  await towerLoop(3,()=>{ firstRunDone=true; return {dir:S.dir||'cw',wheel:bot.wheel,items:new Set(bot.items)}; },()=>{ tr.show(); runState(true,true); },{ onSuccess:async()=>{ sfx.shutter(); missionCard(true); } });
+  const tr=tray({ options:ITEMS, selected:[...bot.items], multi:true, onPick:v=>{ if(!firstRunDone) S.changedBeforeFirst=true; bot.items=v; kick(bot,0.25); dirty(); log('setting_changed',{tower:3,variable:'load',items:[...v],anticipated:!firstRunDone}); } });
+  await towerLoop(3,()=>{ firstRunDone=true; return {dir:S.dir||'cw',wheel:bot.wheel,items:new Set(bot.items)}; },()=>{ tr.show(); runState(true,true); },{ ask:'What should the bot carry today?', found:FOUND[3], onSuccess:async()=>{ sfx.shutter(); missionCard(true); } });
   tr.remove(); await wait(600); show(H.mission,false);
 }
 const G4D=1.6;
 async function G4(){ S.chapter='G4'; S.hintText='How far does one turn go?';
   placeBotSpan(bot,3,G4D); bot.items=new Set(['camera']); if(bot.wheel!=='band') bot.wheel='band';
-  const mp=spanPoint(3,5.6); const view={x:mp.x+0.6,y:mp.y-40/82,zoom:82}; await crane(view,2.4); await banner('TOWER 4','COUNT THE CLIMB'); show(H.banner,false);
+  const mp=spanPoint(3,5.6); const view={x:mp.x+0.6,y:mp.y-40/82,zoom:82}; await crane(view,2.4); await banner('TOWER 4','COUNT THE CLIMB',{route:3,fix:['turns'],lead:'YOU COUNT'}); show(H.banner,false);
   world.ruler={span:3,d0:G4D,len:9.4,reveal:0}; sfx.whoosh(); await tween(world.ruler,{reveal:1},0.9,ease.out);
   const tb=html('div','panel fade'); tb.id='table'; UI.appendChild(tb);
   const rows=[]; const paintTable=()=>{ tb.innerHTML=`<div class="hd"><span>${img('ui_hdr_turns')}Turns</span><span>${img('ui_hdr_distance')}Distance</span></div>`+rows.map(r=>r.grp?`<div class="grp">${r.grp}</div>`:`<div class="r ${r.n?'new':''}"><span>${r.t}</span><span>${r.d}</span></div>`).join(''); rows.forEach(r=>r.n=false); };
@@ -435,11 +478,11 @@ async function G4(){ S.chapter='G4'; S.hintText='How far does one turn go?';
     return P(done=>{ const an=st.animate([{transform:T(0,10,.3),opacity:0},{transform:T(0,-6,1.12),opacity:1,offset:.22},{transform:T(0,0,1),offset:.45},{transform:T(dx,dy,.62),opacity:.9}],{duration:1150,easing:'cubic-bezier(.4,0,.3,1)'});
       const fin=()=>{ st.remove(); if(rowEl) rowEl.style.visibility=''; }; an.onfinish=()=>{ fin(); done(); }; return ()=>{ an.cancel(); fin(); }; }); };
   const turnOnce=async()=>{ const r=R(bot), C=2*Math.PI*r; world.ribbon=world.ribbon||{span:3,d0:G4D,len:0}; world.ribbon.seg=C; const from=bot.d; await P(done=>{ motion={b:bot,phases:[{up(m,dt){ const st=Math.min(C/1.2*dt, from+C-bot.d); bot.d+=st; bot.angle+=st/r; world.ribbon.len=bot.d-G4D; sfx.motor(true,0.6); return bot.d>=from+C-1e-6; }}],i:0,t:0,speed:1,done}; return ()=>{ motion=null; }; }); sfx.motor(false); };
-  async function watchTurns(n,cm){ const t=html('div','fade'); t.id='tray'; t.innerHTML=`<div class="row"><button class="opt wide" id="oneTurn">${img('ui_one_turn','main')}<span>1 turn</span></button></div>`; UI.appendChild(t);
-    for(let k=1;k<=n;k++){ nudge($('#oneTurn'),{tip:'Tap to turn the wheel once',key:'oneturn',delay:500}); await click($('#oneTurn')); $('#oneTurn').disabled=true; await turnOnce(); rows.push({t:k,d:`${k*cm} cm`,n:true}); paintTable(); sfx.pop(); await stampToRow(cm); sfx.chime(); $('#oneTurn').disabled=false; } t.remove(); }
+  async function watchTurns(n,cm){ question('Turn the wheel. How far does the bot go?').classList.add('aside'); const t=html('div','fade'); t.id='tray'; t.innerHTML=`<div class="row"><button class="opt wide" id="oneTurn">${img('ui_one_turn','main')}<span>1 turn</span></button></div>`; UI.appendChild(t);
+    for(let k=1;k<=n;k++){ nudge($('#oneTurn'),{tip:'Tap to turn the wheel once',key:'oneturn',delay:500}); await click($('#oneTurn')); $('#oneTurn').disabled=true; await turnOnce(); rows.push({t:k,d:`${k*cm} cm`,n:true}); paintTable(); sfx.pop(); await stampToRow(cm); sfx.chime(); $('#oneTurn').disabled=false; } t.remove(); rmq(); }
   async function predictRun(target,cm,ctxName){ bot.d=G4D; world.ribbon.len=0; dirty();
     world.flags=[{span:3,d:G4D+target/10}]; sfx.pop();
-    question('How many turns to the flag?');
+    question(`The flag is ${target} cm up. How many turns?`).classList.add('aside'); // the height is in the question: the flag itself carries no number
     let val=3; const t=html('div','fade'); t.id='tray'; t.innerHTML=`<div class="steplbl">Your turns</div><div class="stepper"><button class="imgbtn" id="minus" aria-label="Fewer">${img('ui_btn_minus')}</button><div class="val" id="sv">${val}</div><button class="imgbtn" id="plus" aria-label="More">${img('ui_btn_plus')}</button></div>`; UI.appendChild(t);
     $('#minus').onclick=()=>{ val=Math.max(1,val-1); $('#sv').textContent=val; sfx.tick(); }; $('#plus').onclick=()=>{ val=Math.min(99,val+1); $('#sv').textContent=val; sfx.tick(); };
     nudge(t.querySelector('.stepper'),{ring:false,tip:'Use − and + to set your turns',key:'stepper',delay:600}); runState(true,true); await click(runBtn); runState(false); t.remove(); rmq();
@@ -464,6 +507,7 @@ async function G4(){ S.chapter='G4'; S.hintText='How far does one turn go?';
   // finish the span
   tb.remove(); world.flags=[]; world.ribbon=null; world.ruler=null; dirty();
   await performRun(bot,4,{dir:'cw',wheel:bot.wheel,items:new Set(['camera'])}); lensHide(); await towerArrive(3); await addClock(4);
+  await say(FOUND[4][0],{found:FOUND[4][1]});
 }
 async function G5(){ S.chapter='G5'; S.hintText='';
   cine(true); await camPath([{x:30,y:16,zoom:24,rot:-0.03,d:1.6,ease:'power2.inOut'},{x:16,y:10.5,zoom:30,rot:0,d:1.8,ease:'power3.out'}]); cine(false); $('#dim').classList.add('on');
@@ -504,7 +548,7 @@ async function blueprint(){
 async function G6(){ S.chapter='G6'; S.hintText='Check all three: turn, wheel, load.';
   placeBotSpan(bot,3,SPANS[3].len-0.32); bot.dim=true; bot.beacon=false; world.ropeRuler=true;
   spare.visible=false; spare.mode='rope'; spare.d=0; spare.wheel='smooth'; spare.items=new Set(['camera','lamp','toolbox','battery']); spare.angle=0; spare.dim=false;
-  cine(true); await camPath([{x:36,y:19,zoom:48,rot:0.05,d:1.3,ease:'power2.in'},{...V.rope,rot:0,d:1.8,ease:'back.out(1.2)'}]); cine(false); await banner('THE TOP','THE HANGING ROPE'); show(H.banner,false);
+  cine(true); await camPath([{x:36,y:19,zoom:48,rot:0.05,d:1.3,ease:'power2.in'},{...V.rope,rot:0,d:1.8,ease:'back.out(1.2)'}]); cine(false); await banner('THE TOP','THE HANGING ROPE',{route:4,fix:['dir','wheel','load','turns'],lead:'YOU SET'}); show(H.banner,false);
   sfx.clack(); spare.visible=true; spare.alpha=0; spare.drop=0; await tween(spare,{alpha:1},0.35); kick(spare,0.5);
   const ft=html('div','chip fade',`${img('ui_factory_tag')}Factory set-up`); const fp=pin(ft,()=>{ const c=botBodyCenter(spare); return [c.x,c.y]; },70,-150); await wait(1800); unpin(fp);
   const st={dir:'ccw',wheel:'smooth',items:new Set(spare.items)}; let tab='dir'; let pred=null;
@@ -518,7 +562,7 @@ async function G6(){ S.chapter='G6'; S.hintText='Check all three: turn, wheel, l
         t.querySelector('#minus').onclick=()=>setv(Math.max(1,(pred??9)-1)); t.querySelector('#plus').onclick=()=>setv(Math.min(99,(pred??7)+1)); } });
     if(tab==='load') tr=tray({...common, options:ITEMS, multi:true, selected:[...st.items], onPick:v=>{ st.items=v; spare.items=new Set(v); kick(spare,0.2); dirty(); log('setting_changed',{tower:'rope',variable:'load',items:[...v]}); } });
     stage.classList.add('tray-left'); tr.el.style.left=(tr.el.offsetWidth/2+126)+'px'; } // left-anchored, right of the hint note, so the bot at the rope base stays visible // left-anchored so the bot at the rope base (screen x≈780) stays visible
-  build(); setTimeout(()=>{ const tb=$('#tray .tabs'); tb&&nudge(tb,{ring:false,tip:'Use these tabs to set up the bot',key:'tabs',delay:200}); },400);
+  build(); question('Set up the new bot to climb the rope.').classList.add('left'); // left: keeps the camera mount (the target) in view setTimeout(()=>{ const tb=$('#tray .tabs'); tb&&nudge(tb,{delay:200}); },400); // glow only: the tabs carry the same icons as the mission brief
   let runs=0, success=false, wentGo=false;
   while(runs<2&&!success){
     runState(true,true); if(runs===1){ runBtn.querySelector('.lbl').innerHTML='RUN<br><small style="font-size:16px">1 run left</small>'; }
@@ -526,7 +570,7 @@ async function G6(){ S.chapter='G6'; S.hintText='Check all three: turn, wheel, l
     const which=await P(done=>{ const h=async()=>{ if(pred===null){ tab='turns'; build(); const e=$('#tray .stepper'); e&&e.animate([{transform:'scale(1)'},{transform:'scale(1.08)'},{transform:'scale(1)'}],{duration:400}); return; } /* no guess yet: open the Turns tab */ done('run'); }; runBtn.addEventListener('click',h); const g=()=>done('go'); goBtn&&goBtn.addEventListener('click',g); return ()=>{ runBtn.removeEventListener('click',h); goBtn&&goBtn.removeEventListener('click',g); }; });
     goBtn&&goBtn.remove(); if(which==='go'){ wentGo=true; break; }
     runs++; if(runs===2) log('rope_retry',{initiated:true});
-    tr.hide(); spare.d=0; log('run_started',{tower:'rope',run:runs,setup:{dir:st.dir,wheel:st.wheel,items:[...st.items]},predicted:pred});
+    tr.hide(); rmq(); spare.d=0; log('run_started',{tower:'rope',run:runs,setup:{dir:st.dir,wheel:st.wheel,items:[...st.items]},predicted:pred});
     const {o,actual}=await performRun(spare,'rope',{dir:st.dir,wheel:st.wheel,items:new Set(st.items)});
     success=o.type==='climbed'&&o.jobDone; const cm=st.wheel.startsWith('big')?15:10, needed=120/cm;
     if(success){ world.mountFlash=1; sfx.shutter(); tween(world,{mountFlash:0},0.8).catch(()=>{}); world.topLit=true;
@@ -562,7 +606,8 @@ async function G7(){ S.chapter='G7'; S.hintText=''; runState(false); show(H.bann
   await camPath([{x:18,y:12,zoom:28,rot:0,d:2.2,ease:'power3.inOut'}]); cine(false);
   const card=html('div','panel fade'); card.id='endcard'; card.style.position='absolute';
   card.innerHTML=`<div class="tk"><div class="postcard"><div class="pc-photo"></div><div class="pc-cap">Hilltop Ropeway · Left at ${fmt(S.clock)}</div></div>${onTime?img('ui_star_burst','burst'):''}</div>
-    <div><h2>${onTime?'On time. Your class is riding up.':'Your class is riding up.'}</h2><p>${onTime?'The bot cleared every tower before 7:00.':'A little late, but every tower was checked.'}</p>
+    <div><h2>${onTime?'On time. Your class is riding up.':'Your class is riding up.'}</h2>
+    <div class="learnt"><b>What you found out</b>${LEARNT.map(([ic,t])=>`<div class="ln">${img(ic)}<span>${t}</span></div>`).join('')}</div>
     <div class="stats"><span>${world.lit.filter(Boolean).length+(world.topLit?1:0)} / 5 checks</span><span>${S.points} points</span></div>
     <div class="kit"><video class="teaser" muted playsinline preload="auto" poster="assets/video/tarzan_teaser.webp" src="assets/video/tarzan_teaser.mp4" aria-label="Tarzan Bot kit"></video><span>Next class, your team builds Tarzan Bot and sends it up a real rope.</span></div>
     <div style="margin-top:20px"><button class="btn ghost" id="again">Play again</button></div></div>`;
@@ -575,6 +620,9 @@ async function G7(){ S.chapter='G7'; S.hintText=''; runState(false); show(H.bann
   nudge($('#again'),{delay:2500}); await click($('#again')); play(0);
 }
 
+// end-card recap: one line per learning objective the child met (pulley, direction, grip, load, turns)
+const LEARNT=[['ui_pulley','A turning wheel moves itself along a still rope.'],['ui_tab_direction','The wheel’s turn sets the way.'],
+  ['ui_wheel_band','Steeper rope, more grip.'],['ui_tab_load','Too much load: the bot stalls.'],['ui_one_turn','1 turn = once around the wheel.']];
 /* G7 postcard: copy a crop of the live world canvas around the gondola (sky is CSS behind the canvas, so paint it in first).
    A GPU canvas-to-canvas copy, no image encoding. Returns {canvas, x, y} with the gondola's stage position for the FLIP. */
 let postcard=null;
@@ -595,7 +643,7 @@ function preset(idx){ const id=CH[idx][0]; const lit=n=>world.lit=[0,1,2,3].map(
   if(id==='G7'){ world.topLit=true; spare.visible=true; spare.mode='rope'; spare.d=12-0.25; spare.wheel='band'; spare.items=new Set(['camera']); bot.dim=true; world.ropeRuler=false; }
   introOff(); closeNotes(); world.cover=false; world.bg=null; stage.classList.remove('cover'); stage.classList.remove('tray-left'); world.lit.forEach((l,i)=>trackLit[i]=l); trackTop=world.topLit; world.pulse=null; S.sunrise=S.clock>=380; postcard=null;
   if(idx>0){ mood.ambience(true); mood.bed(world.topLit?5:Math.min(4,1+world.lit.filter(Boolean).length)); } else { mood.bed(0); mood.ambience(false); }
-  paintClock(); paintTracker(); show(H.clock,idx>0); show(H.tracker,idx>=4); show(H.banner,false); show(H.mission,false);
+  paintClock(); paintTracker(); show(H.clock,idx>0); show(H.tracker,idx>=1); /* the rail is the mission's progress: on from the mission brief (end of S1) */ show(H.banner,false); show(H.mission,false);
   show(H.notebook,false); /* "Your guess" now lives in the info note */
   if(idx===0) S.guess=null;
   if(idx>0&&idx<4) Object.assign(cam, V.station);
@@ -620,8 +668,9 @@ soundMenu.onclick=e=>{ e.stopPropagation(); const a=e.target.closest('button'); 
   if(a.dataset.a==='replay'){ if(lastLine) speak(lastLine); closeNotes(); }
   if(a.dataset.a==='fs'){ goFullscreen(); closeNotes(); }
   if(a.dataset.a==='mute'){ setMuted(!isMuted()); if(isMuted()&&voEl){ voEl.pause(); voEl=null; } try{ if(isMuted()) speechSynthesis.cancel(); }catch(err){} paintMute(); sfx.tick(); } };
-const GOALS={S1:'Your class wants the first ride at 7:00. The bot must check the cable first.',S2:'Meet the inspection bot.',S3:'Make your guess.',S4:'Explore the station.',
-  G1:'Get the bot to Tower 1.',G2:'Get the bot to Tower 2.',G3:'Get the bot to Tower 3 and film the cable.',G4:'Count the turns to Tower 4.',G5:'Pick the true sentence.',G6:'Set up the bot to climb the hanging rope.',G7:'Ride up the hill!'};
+// info note: the mission, then this step's job. States the task, never the fix.
+const GOALS={S1:'Your class wants the first ride at 7:00. The bot must check the cable first.',S2:'Meet the bot that checks the cable.',S3:'Guess: will the bot reach the top?',S4:'See how a wheel moves along a rope.',
+  G1:'Get the bot up Tower 1. You fix: the turn.',G2:'Get the bot up Tower 2. You fix: the wheel.',G3:'Get the bot up Tower 3 and film the cable. You fix: the load.',G4:'Find how far one turn goes. Then predict.',G5:'Pick the true sentence.',G6:'Set up the new bot for the rope.',G7:'Ride up the hill!'};
 infoBtn.onclick=e=>{ e.stopPropagation(); infoNote.querySelector('.txt').innerHTML=`<b>${GOALS[S.chapter]||GOALS.S1}</b>${S.guess?`<span>Your guess: ${({yes:'Yes',partway:'Partway',no:'No'})[S.guess]}</span>`:''}<span>First ride 7:00 · now ${fmt(S.clock)} am</span>`; toggleNote(infoBtn,infoNote); };
 infoNote.onclick=e=>e.stopPropagation();
 document.addEventListener('click',()=>closeNotes());

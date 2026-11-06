@@ -37,11 +37,28 @@ LINES = {
     "h_g3": "Read the mission card again.",
     "h_g4": "How far does one turn go?",
     "h_g6": "Check all three: turn, wheel, load.",
+    # learning-objective pass: mission brief, step questions, what each tower showed
+    "s1_mission": "Your mission: get the bot to the top. Check four towers, and the rope at the top. You set its turn, its wheel, and its load. The first ride is at seven. A failed run costs four minutes.",
+    "g1_q": "Which way should the wheel turn?",
+    "g2_q": "Steeper cable. Which wheel will get the bot up?",
+    "g3_q": "What should the bot carry today?",
+    "g4_watch": "Turn the wheel. How far does the bot go?",
+    "g4_q80": "The flag is eighty centimeters up. How many turns?",
+    "g4_q90": "The flag is ninety centimeters up. How many turns?",
+    "g6_q": "Set up the new bot to climb the rope.",
+    "f_t1": "Tower one checked. The way the wheel turns sets which way the bot goes.",
+    "f_t2": "Tower two checked. On the steep cable, the grooved wheel with a band did not slip.",
+    "f_t3": "Tower three checked. With only the camera, the bot was light enough to climb.",
+    "f_t4": "Tower four checked. Each turn moves the bot the distance around its wheel. The bigger wheel goes farther.",
 }
 
-k = Kokoro(os.path.join(HERE, "kokoro-v1.0.onnx"), os.path.join(HERE, "voices-v1.0.bin"))
+# optional 4th arg: comma-separated ids to render (default: all). KOKORO_DIR: where the model files live (default: here)
+only = set(sys.argv[4].split(",")) if len(sys.argv) > 4 else None
+MD = os.environ.get("KOKORO_DIR", HERE)
+k = Kokoro(os.path.join(MD, "kokoro-v1.0.onnx"), os.path.join(MD, "voices-v1.0.bin"))
 report = {}
 for key, text in LINES.items():
+    if only and key not in only: continue
     samples, sr = k.create(text, voice=voice, speed=speed, lang="en-us")
     wav = os.path.join(out, key + ".wav")
     sf.write(wav, samples, sr)

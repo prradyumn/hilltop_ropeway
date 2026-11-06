@@ -47,10 +47,6 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 #lens.full{left:0;top:0;bottom:auto;width:100%;height:100%;border-radius:0;box-shadow:none;z-index:16;transform-origin:0 0;transition:none}
 #lens.full .tag,#lens.full .name{top:100px;font-size:20px;padding:9px 14px}
 #lens.full .tag{left:40px} #lens.full .name{right:40px}
-.scaleRuler{position:absolute;right:64px;top:50%;margin-top:-100px;z-index:25;pointer-events:none;display:grid;gap:22px;padding:18px 22px 18px 44px;background:rgba(20,22,46,.62);border-radius:22px;color:rgba(255,255,255,.5);font:900 26px/36px var(--font);font-variant-numeric:tabular-nums}
-.scaleRuler span{transition:color .25s,transform .25s;transform-origin:left center}
-.scaleRuler span.on{color:#fff;transform:scale(1.12)}
-.scaleRuler .mk{position:absolute;left:18px;top:30px;width:14px;height:14px;border-radius:50%;background:var(--yellow);box-shadow:0 0 0 4px rgba(255,200,61,.3);transition:transform .45s cubic-bezier(.3,1.4,.5,1)}
 #lens canvas{position:absolute;inset:0;width:100%;height:100%}
 #lens .tag{position:absolute;left:14px;top:12px;background:rgba(35,40,74,.82);color:#fff;font:800 15px/1 var(--font);letter-spacing:.08em;padding:7px 11px;border-radius:999px}
 #lens .name{position:absolute;right:14px;top:12px;background:#fff;color:var(--navy);font:800 16px/1 var(--font);padding:7px 12px;border-radius:999px}
@@ -305,10 +301,6 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 @keyframes tcIn{from{opacity:0;transform:translate(-50%,-40%) scale(.92);filter:blur(6px)}to{opacity:1;transform:translate(-50%,-50%);filter:none}}
 @keyframes tcOut{to{opacity:0;transform:translate(-50%,-140%) scale(.5)}}
 @keyframes tcLine{to{width:220px}}
-.timecard{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);z-index:30;text-align:center;color:#fff;pointer-events:none;animation:tcIn .7s cubic-bezier(.2,.9,.25,1.1) both}
-.timecard .t{font:900 120px/1 var(--font);text-shadow:0 6px 0 rgba(20,22,46,.35),0 20px 40px rgba(20,22,46,.5)} .timecard .t small{font-size:40px;margin-left:8px}
-.timecard .s{font:800 28px/1 var(--font);letter-spacing:.06em;margin-top:12px;text-shadow:0 2px 0 rgba(20,22,46,.4)}
-.timecard.out{animation:tcGo .5s cubic-bezier(.6,0,.8,.4) forwards}
 @keyframes tcGo{to{opacity:0;transform:translate(-160%,-260%) scale(.3)}}
 /* ---------- start screen ---------- */
 #start .title{animation:titleIn 1.1s cubic-bezier(.2,.9,.25,1.15) .2s both}
@@ -502,3 +494,53 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 .titlecard .tc-name{font:400 88px/1.04 var(--fredoka);color:#fff;letter-spacing:.01em;text-shadow:0 5px 0 #0F57A7,0 18px 40px rgba(20,22,46,.45);margin-top:16px}
 .titlecard .tc-line{background:#00AEEF;height:7px}
 @media (prefers-reduced-motion: reduce){ .floatimg.shine{animation:floatUp 1.1s forwards} }
+
+/* 10: learning-objective pass — the mission drawn as a route (brief + every tower card), what you fix, found cards, end recap */
+#clock .due{position:absolute;left:50%;top:88px;transform:translateX(-50%);white-space:nowrap;background:var(--skaiCream);color:var(--skaiNavy);font:400 15px/1 var(--fredoka);padding:6px 10px;border-radius:8px;box-shadow:0 3px 0 rgba(0,26,112,.12)}
+#clock.attn,#tracker.attn{animation:attn 1.2s ease-in-out 2}
+/* route: bot → 1 2 3 4 → Top → 7:00 */
+.route{display:flex;align-items:flex-end;justify-content:center}
+.route .stop{display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;width:86px}
+.route .stop img{width:74px;height:74px;object-fit:contain}
+.route .stop b{font:400 21px/1 var(--fredoka);color:var(--skaiNavy)}
+.route .stop:not(.done):not(.cur):not(.bot):not(.ride) b{color:#8C93AE}
+.route .stop.cur::before{content:"";position:absolute;left:50%;top:38px;width:92px;height:92px;margin:-46px 0 0 -46px;border-radius:50%;background:radial-gradient(circle,rgba(255,200,61,.55),rgba(255,200,61,0) 70%)}
+.route .stop.cur img{position:relative;animation:bob 1.2s ease-in-out infinite}
+.route .stop.cur b{color:var(--skaiOrange)}
+.route .stop.ride b{color:var(--skaiOrange)}
+.route .rs{flex:1;min-width:30px;max-width:44px;height:6px;margin:0 2px 42px;border-radius:3px;background:repeating-linear-gradient(90deg,#B9C3D6 0 8px,transparent 8px 13px)}
+.route .rs.done{background:var(--skaiOrange)}
+.fixes{display:flex;align-items:center;gap:14px}
+.fixes small{font:700 17px/1 var(--chakra);letter-spacing:.14em;color:var(--skaiInk);margin-right:2px}
+.fixes span{display:flex;flex-direction:column;align-items:center;gap:4px}
+.fixes img{width:64px;height:64px;object-fit:contain}
+.fixes b{font:400 20px/1 var(--fredoka);color:var(--skaiNavy)}
+/* tower title cards carry the route ("you are here") and what you fix, on a paper strip */
+.titlecard.map{top:46%}
+.titlecard.map .tc-name{white-space:nowrap}
+.titlecard .tc-map{display:inline-flex;flex-direction:column;align-items:center;gap:14px;margin-top:22px;background:#FFFDF6;border-radius:22px;padding:18px 26px 16px;box-shadow:0 0 0 3px #fff,0 0 0 6px rgba(0,174,239,.28),0 18px 40px rgba(20,22,46,.35)}
+.titlecard .tc-map .fixes{border-top:2px dashed #E6DFD2;padding-top:12px}
+/* mission brief */
+#brief{left:50%;top:50%;transform:translate(-50%,-50%);width:900px;padding:32px 40px 28px;z-index:20;text-align:center}
+#brief.fade{animation-name:fadeUpC}
+#brief::before{content:"";position:absolute;left:34px;top:-13px;width:84px;height:22px;background:rgba(0,174,239,.5);rotate:-3deg;border-radius:3px;box-shadow:0 2px 0 rgba(0,0,0,.06);pointer-events:none}
+#brief .eb{display:inline-block;background:#FFE58A;color:#0F57A7;font:700 20px/1 var(--chakra);letter-spacing:.18em;padding:9px 16px 8px;border-radius:4px;rotate:-2deg;box-shadow:0 3px 0 rgba(0,0,0,.12)}
+#brief h2{margin:14px 0 22px;font:400 50px/1.05 var(--fredoka);color:var(--skaiNavy)}
+#brief .route .stop,#brief .route .rs{animation:optIn .4s cubic-bezier(.2,.9,.25,1.25) both;animation-delay:calc(1.6s + var(--k)*.2s)}
+#brief .row2{display:flex;align-items:center;justify-content:center;gap:40px;margin-top:22px;padding-top:18px;border-top:2px dashed #E6DFD2}
+#brief .row2 .fixes,#brief .row2 .cost{opacity:0;transform:translateY(16px);transition:opacity .4s,transform .45s cubic-bezier(.2,.9,.25,1.25)}
+#brief.s2 .row2 .fixes,#brief.s3 .row2 .cost{opacity:1;transform:none}
+#brief .cost{display:flex;align-items:center;gap:12px;text-align:left;font:800 22px/1.2 var(--font);color:var(--navy)}
+#brief .cost img{width:84px;object-fit:contain}
+#brief .ft{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:22px}
+/* found card: the icon of what worked + a FOUND stamp in front of the line */
+#caption .fnd{position:relative;flex:none;width:92px;height:92px;margin:-20px 0 -20px 4px;display:grid;place-items:center;background:#FFF1D2;border-radius:20px;rotate:-4deg;box-shadow:0 0 0 3px #fff,0 6px 12px rgba(35,40,74,.18);animation:pop .5s .1s both}
+#caption .fnd img{width:72px;height:72px;object-fit:contain}
+#caption .fnd b{position:absolute;left:50%;bottom:-12px;transform:translateX(-50%);background:var(--teal);color:#fff;font:700 14px/1 var(--chakra);letter-spacing:.14em;padding:5px 9px 4px;border-radius:4px}
+#question.aside{left:calc(50% + 130px)}
+#question.left,#question.fade.left{left:40px;transform:none;--tx:0}
+#endcard .learnt{margin-top:14px;display:grid;gap:4px}
+#endcard .learnt>b{font:700 16px/1 var(--chakra);letter-spacing:.14em;text-transform:uppercase;color:var(--skaiInk);margin-bottom:4px}
+#endcard .learnt .ln{display:flex;align-items:center;gap:12px;font:800 22px/1.2 var(--font);color:var(--navy)}
+#endcard .learnt{white-space:nowrap}
+#endcard .learnt .ln img{width:36px;height:36px;object-fit:contain;flex:none}
