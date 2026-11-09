@@ -23,7 +23,7 @@ LINES = {
     "s4_same": "Same kind of wheel. Watch it on the bot.",
     "s4_q": "In the bot, what stays still?",
     "s4_rope": "The rope stays still, so the wheel moves itself along it.",
-    "s4_pulley": "Pulley. A wheel with a groove that guides a rope.",
+    "s4_pulley": "Pulley. A wheel with a groove: a dip round its edge, where the rope sits.",
     "g4_q": "How many turns to the flag?",
     "g5_q": "Which sentence is true?",
     "g5_grip": "The steeper the rope, the more grip the wheel needs, so a slipping bot needs a grippier wheel or a lighter load.",
@@ -50,6 +50,11 @@ LINES = {
     "f_t2": "Tower two checked. On the steep cable, the grooved wheel with a band did not slip.",
     "f_t3": "Tower three checked. With only the camera, the bot was light enough to climb.",
     "f_t4": "Tower four checked. Each turn moves the bot the distance around its wheel. The bigger wheel goes farther.",
+    # spotlight pass: the part each step changes, named in plain words
+    "p_turn": "Turn. You choose which way the wheel spins.",
+    "p_wheel": "Wheel. You can swap it for a different wheel.",
+    "p_load": "Load. Everything the bot carries.",
+    "p_tape": "Tape. It shows how far the bot goes.",
 }
 
 # optional 4th arg: comma-separated ids to render (default: all). KOKORO_DIR: where the model files live (default: here)

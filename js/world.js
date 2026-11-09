@@ -267,12 +267,22 @@ function drawRuler(){ const R=world.ruler; if(!R) return; const s=SPANS[R.span],
   if(world.measureLabels) for(let k=0;k<=Math.floor(L+1e-6);k+=2){ const [px,py]=P(R.d0+k); ctx.save(); ctx.translate(px - s.nx*z*0.02, py + s.ny*z*0.02); ctx.rotate(-s.ang);
     ctx.fillStyle=COL.navy; ctx.font=`800 ${Math.max(9,z*0.17)}px Nunito, system-ui, sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(String(k*10),0,z*0.02); ctx.restore(); }
 }
-function drawRibbon(){ const R=world.ribbon; if(!R||R.len<=0) return; const s=SPANS[R.span]; const z=Z();
-  const p0=spanPoint(R.span,R.d0), p1=spanPoint(R.span,R.d0+R.len); const [ax,ay]=toScreen(p0.x+s.nx*0.06,p0.y+s.ny*0.06), [bx,by]=toScreen(p1.x+s.nx*0.06,p1.y+s.ny*0.06);
-  ctx.strokeStyle=COL.coral; ctx.lineWidth=Math.max(2,z*0.07); ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
-  // tape marks: one notch per wheel turn (R.seg = distance per turn, su), so the ribbon reads as measured pieces
-  if(R.seg){ ctx.strokeStyle='#fff'; ctx.lineWidth=Math.max(1.5,z*0.03); ctx.beginPath(); const h=z*0.09;
-    for(let d=R.seg; d<=R.len+1e-6; d+=R.seg){ const p=spanPoint(R.span,R.d0+d); const [px,py]=toScreen(p.x+s.nx*0.06,p.y+s.ny*0.06); ctx.moveTo(px-s.nx*h,py+s.ny*h); ctx.lineTo(px+s.nx*h,py-s.ny*h); } ctx.stroke(); } }
+/* G4 "the wheel unrolls": the distance once around the wheel is laid on the cable as a coloured strip, one colour per turn
+   (the same colours as the bar blocks in the G4 panel), with a white notch between turns. */
+export const RIBBON_COLS=['#F0644A','#1FA898'];
+function drawRibbon(){ const R=world.ribbon; if(!R||R.len<=0) return; const s=SPANS[R.span]; const z=Z(); const seg=R.seg||R.len;
+  const at=d=>{ const p=spanPoint(R.span,R.d0+d); return toScreen(p.x+s.nx*0.06,p.y+s.ny*0.06); };
+  ctx.lineWidth=Math.max(3,z*0.075); ctx.lineCap='butt';
+  for(let k=0, d=0; d<R.len-1e-6; k++, d+=seg){ const e=Math.min(R.len,d+seg); const [ax,ay]=at(d), [bx,by]=at(e);
+    ctx.strokeStyle=RIBBON_COLS[(k+(R.c0||0))%2]; ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke(); }
+  if(R.seg){ ctx.strokeStyle='#fff'; ctx.lineWidth=Math.max(1.5,z*0.03); ctx.beginPath(); const h=z*0.1;
+    for(let d=R.seg; d<=R.len+1e-6; d+=R.seg){ const [px,py]=at(d); ctx.moveTo(px-s.nx*h,py+s.ny*h); ctx.lineTo(px+s.nx*h,py-s.ny*h); } ctx.stroke(); } }
+/* the rim still to be laid: a coloured arc on the wheel that shrinks as the strip grows (peel.k = 0..1 of this turn) */
+function drawPeel(){ const R=world.ribbon; if(!R||!R.peel) return; const b=R.peel.b; if(!b||!b.visible) return; const W=WHEELS[b.wheel], z=Z(); const s=SPANS[b.span];
+  const w=botWheelCenter(b); const [cx,cy]=toScreen(w.x,w.y); const r=W.r*z*(b.wheelPop||1); const left=(1-R.peel.k)*Math.PI*2; if(left<0.02) return;
+  const a0=Math.atan2(s.ny,-s.nx); // screen angle of the contact point (towards the cable)
+  ctx.lineCap='round'; ctx.lineWidth=Math.max(3,r*0.3); ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(cx,cy,r*0.93,a0,a0-left,true); ctx.stroke();
+  ctx.lineWidth=Math.max(2,r*0.2); ctx.strokeStyle=RIBBON_COLS[R.peel.c%2]; ctx.beginPath(); ctx.arc(cx,cy,r*0.93,a0,a0-left,true); ctx.stroke(); }
 // light pulse running down the cable from a tower that was just cleared (world.pulse = {from: tower index, p: 0..1})
 function drawPulse(){ const P=world.pulse; if(!P) return; const z=Z(); const pts=[P0,...TOWERS.slice(0,P.from+1)];
   let total=0; const segs=[]; for(let i=1;i<pts.length;i++){ const l=Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y); segs.push(l); total+=l; }
@@ -359,7 +369,7 @@ export function drawWorld(imgs){
   drawStation(); TOWERS.forEach((_,i)=>drawTower(i)); drawMast();
   drawRuler(); drawCable(); drawPulse(); drawRibbon(); drawPathDots(); drawFlags(imgs.flag);
   drawGondola(imgs.gondola);
-  world.bots.forEach(drawBot);
+  world.bots.forEach(drawBot); drawPeel();
   drawGate(); drawKids();
   TREES.filter(t=>!t.back).forEach(t=>drawTree(t,true)); drawTufts();
 }
@@ -416,7 +426,7 @@ function drawPainted(imgs){
   drawRuler(); drawCable(); drawPulse(); drawRibbon(); drawPathDots(); drawFlags(imgs.flag);
   drawGondolaPainted();
   drawButterflies();
-  world.bots.forEach(drawBot);
+  world.bots.forEach(drawBot); drawPeel();
   drawGate(true); drawOperator(); drawKidsPainted();
   TREES.filter(tr=>!tr.back).forEach(tr=>{ const n=treeName(tr,1); pimg(n,tr.x,ground(tr.x)-0.2,PTH[n]*Math.min(1.15,Math.max(0.85,tr.s)),0.5,0.97,{flip:tr.v===2}); });
   drawGrassEdge();

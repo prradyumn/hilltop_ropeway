@@ -41,6 +41,13 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
   -webkit-mask-image:radial-gradient(circle,#000 0 12%,rgba(0,0,0,.6) 30%,transparent 62%);mask-image:radial-gradient(circle,#000 0 12%,rgba(0,0,0,.6) 30%,transparent 62%)}
 #dim{position:absolute;inset:0;background:rgba(29,33,64,.45);opacity:0;pointer-events:none;transition:opacity .4s}
 #dim.on{opacity:1}
+/* spotlight: one soft pool of light on the part that matters; everything else dims. The dark is the box-shadow (painted once);
+   #spot is moved/scaled by transform only. Under #pins/#ui, so labels and choices stay bright. Iris closes in on show. */
+#spot{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;opacity:0;transition:opacity .45s ease;will-change:transform,opacity}
+#spot.on{opacity:1}
+#spot i{position:absolute;left:-190px;top:-190px;width:380px;height:380px;border-radius:50%;background:radial-gradient(closest-side,rgba(13,16,40,0) 52%,rgba(13,16,40,.18) 68%,rgba(13,16,40,.58) 100%);box-shadow:0 0 0 4200px rgba(13,16,40,.58)}
+#spot.on i{animation:irisIn .7s cubic-bezier(.2,.8,.2,1) both}
+@keyframes irisIn{from{transform:scale(3.4)}to{transform:none}}
 /* lens */
 #lens{position:absolute;left:32px;bottom:32px;width:438px;height:274px;border-radius:26px;background:linear-gradient(180deg,#DDEBFA,#F6EEDF);box-shadow:0 0 0 6px #fff,var(--shadow);overflow:hidden;opacity:0;transform:translateY(20px) scale(.96);transition:opacity .22s,transform .28s cubic-bezier(.2,.9,.25,1.15);pointer-events:none}
 #lens.on{opacity:1;transform:none}
@@ -102,7 +109,18 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 .pin span{background:#fff;border-radius:999px;padding:6px 12px;font:900 18px/1 var(--font);box-shadow:var(--shadow);color:var(--navy)}
 .pin.dashed span{outline:3px dashed var(--teal);outline-offset:3px}
 .pin.ok span{background:var(--teal);color:#fff}
-.tagpin{margin:-26px 0 0 18px;background:#fff;border-radius:999px;padding:9px 14px;font:900 19px/1 var(--font);box-shadow:var(--shadow);white-space:nowrap}
+.parttag{width:0;height:0;pointer-events:none!important}
+.parttag .in{position:absolute;left:0;top:0;transform:translateY(-50%);display:flex;align-items:center;gap:12px;background:#FFFDF6;border-radius:20px;padding:12px 18px 12px 12px;box-shadow:0 0 0 3px #fff,var(--shadow);width:max-content;max-width:380px;animation:ptIn .4s cubic-bezier(.2,.9,.25,1.25) both}
+.parttag .in::before{content:"";position:absolute;left:-11px;top:50%;margin-top:-11px;border:11px solid transparent;border-left:0;border-right-color:#FFFDF6}
+.parttag.left .in{transform:translate(-100%,-50%);padding:12px 12px 12px 18px}
+.parttag.left .in::before{left:auto;right:-11px;border-right:0;border-left:11px solid #FFFDF6;border-top-color:transparent;border-bottom-color:transparent}
+.parttag img{width:64px;height:64px;object-fit:contain;flex:none}
+.parttag .pt b{display:block;font:400 28px/1 var(--fredoka);color:var(--skaiNavy)}
+.parttag .pt span{display:block;font:800 21px/1.25 var(--font);color:var(--navy);margin-top:5px;text-wrap:balance}
+.parttag .spk{pointer-events:auto;width:48px;height:48px}
+@keyframes ptIn{from{opacity:0;margin-left:-14px}to{opacity:1;margin-left:0}}
+.parttag.left .in{animation-name:ptInL}
+@keyframes ptInL{from{opacity:0;margin-left:14px}to{opacity:1;margin-left:0}}
 .icopin{width:70px;height:70px;margin:-35px 0 0 -35px;object-fit:contain;filter:drop-shadow(0 4px 4px rgba(35,40,74,.25))}
 .counter{width:96px;height:78px;margin:-118px 0 0 -48px;display:grid;place-items:center;font:900 36px/1 var(--font);background-size:contain;background-repeat:no-repeat;background-position:center;padding-bottom:12px;box-sizing:border-box}
 /* caption + question */
@@ -128,7 +146,6 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 .tab.on{background:var(--navy);color:#fff}
 .opt{position:relative;width:150px;height:158px;border:0;border-radius:22px;background:#F6F3EE;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;font:900 18px/1.1 var(--font);color:var(--navy);text-align:center;transition:transform .12s,background .15s,box-shadow .15s}
 .opt img.main{width:96px;height:92px;object-fit:contain}
-.opt .badge{position:absolute;right:6px;top:6px;width:44px;height:44px;object-fit:contain;background:#fff;border-radius:12px;box-shadow:0 2px 0 rgba(35,40,74,.12)}
 .opt.on{background:var(--sel);box-shadow:inset 0 0 0 4px var(--coral)}
 .opt:active{transform:scale(.97)}
 .opt .chk{position:absolute;left:10px;top:10px;width:30px;height:30px;border-radius:50%;background:#fff;box-shadow:inset 0 0 0 3px #CFC8BA}
@@ -176,24 +193,12 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 .guess img{width:200px;height:170px;object-fit:contain}
 .guess:active{transform:scale(.97)}
 .chipfly{position:absolute;z-index:30;background:#fff;border-radius:999px;box-shadow:var(--shadow);padding:10px 18px;font:900 22px/1 var(--font);color:var(--coral);white-space:nowrap}
-.labelcard{position:absolute;display:flex;align-items:center;gap:16px;padding:16px 26px 16px 14px}
-.labelcard img{width:110px;height:110px;object-fit:contain}
-.labelcard b{display:block;font:900 30px/1 var(--font);letter-spacing:.02em}
-.labelcard span{display:block;font:800 23px/1.25 var(--font);color:var(--muted);margin-top:6px;max-width:330px}
 .floatimg{position:absolute;z-index:25;pointer-events:none;width:150px;margin-left:-75px;animation:floatUp 1.1s cubic-bezier(.2,.8,.3,1) forwards}
 @keyframes floatUp{0%{opacity:0;transform:translateY(20px) scale(.7)}20%{opacity:1;transform:translateY(0) scale(1.05)}100%{opacity:0;transform:translateY(-70px) scale(1)}}
 .chip{position:absolute;background:#fff;border-radius:999px;box-shadow:var(--shadow);padding:10px 18px 10px 10px;font:900 22px/1 var(--font);display:flex;align-items:center;gap:10px;white-space:nowrap}
 .chip img{width:40px;height:40px;object-fit:contain}
 .stamp{position:absolute;z-index:34;pointer-events:none;display:flex;align-items:center;gap:8px;background:#FFF0BD;border:3px solid #E7C66A;border-radius:14px;padding:6px 14px 6px 8px;font:900 26px/1 var(--font);color:var(--navy);box-shadow:0 6px 0 rgba(35,40,74,.15);white-space:nowrap}
 .stamp img{width:40px;height:40px;object-fit:contain}
-/* T4 table */
-#table{position:absolute;right:56px;top:250px;width:330px;padding:18px 20px}
-#table .hd{display:grid;grid-template-columns:1fr 1.3fr;gap:8px;align-items:center;font:900 19px/1 var(--font);color:var(--muted);margin-bottom:8px}
-#table .hd span{display:flex;align-items:center;gap:8px}
-#table .hd img{width:38px;height:38px;object-fit:contain}
-#table .r{display:grid;grid-template-columns:1fr 1.3fr;gap:8px;font:900 32px/1.5 var(--font);font-variant-numeric:tabular-nums;border-top:2px solid #F0EBE2}
-#table .r.new{animation:fadeUp .3s both}
-#table .grp{font:900 16px/1 var(--font);letter-spacing:.1em;color:var(--coral);margin:12px 0 4px}
 /* rule cards */
 #rules{position:absolute;left:50%;top:240px;transform:translateX(-50%);display:grid;gap:16px;width:1080px}
 .rule{border:0;text-align:left;background:var(--card);border-radius:26px;box-shadow:var(--shadow);padding:24px 30px;font:800 28px/1.3 var(--font);color:var(--navy);cursor:pointer;transition:background .15s,box-shadow .15s}
@@ -224,8 +229,6 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 .bp-meter i.f::after{content:"";position:absolute;inset:0;background:#FFC83D;transform:scaleX(0);transform-origin:left;animation:fillx .3s calc(1.3s + var(--i)*.5s + var(--k)*.18s) ease-out forwards}
 .bp-meter span{margin-left:6px}
 @keyframes fillx{to{transform:none}}
-.bp-w{display:flex;align-items:center;gap:8px;margin-top:14px;background:rgba(255,255,255,.12);border-radius:16px;padding:8px 14px 8px 8px;font:900 21px/1.1 var(--font)}
-.bp-w img{width:58px;height:58px;object-fit:contain}
 .bp-rule{position:absolute;left:80px;right:80px;bottom:110px;display:flex;align-items:center;gap:18px}
 .bp-rule p{margin:0;font:900 46px/1.2 var(--font);text-wrap:balance}
 .bp-rule p span{opacity:.12;animation:wordOn .35s calc(3.1s + var(--w)*.13s) forwards}
@@ -244,8 +247,6 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 #endcard .kit{display:flex;align-items:center;gap:16px;margin-top:18px;background:#F6F3EE;border-radius:22px;padding:12px 18px;font:800 23px/1.3 var(--font)}
 #endcard .kit img{width:120px}
 #endcard .kit .teaser{width:256px;height:160px;flex:none;border-radius:14px;object-fit:cover;background:linear-gradient(180deg,#DDEBFA,#F6EEDF)}
-#endcard .stats{display:flex;gap:12px;margin-top:16px;font:900 22px/1 var(--font)}
-#endcard .stats span{background:#F6F3EE;border-radius:999px;padding:10px 16px}
 #endcard .tk .burst{position:absolute;width:150px;right:-10px;top:-140px;animation:pop .7s} /* above the ticket, never over "Left at …" (needs #endcard specificity to beat .tk img width:100%) */
 #endcard.fade{animation-name:fadeUpC}
 @keyframes fadeUpC{from{opacity:0;transform:translate(-50%,calc(-50% + 18px))}to{opacity:1;transform:translate(-50%,-50%)}}
@@ -431,8 +432,6 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 .spk img,.rule .rs img{width:24px;height:auto;object-fit:contain}
 .bp-rule .spk{background:url("../assets/ui/skai/skai_note_sound.webp") center/contain no-repeat}
 
-/* panels that live on the right must clear the rail */
-#table{right:110px;top:290px}
 
 /* ---- de-crowding pass ----
    hint note: fixed bottom-left in every chapter (Figma position); the close-up sits to its right and is compact while choosing */
@@ -445,8 +444,6 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 #soundMenu{height:236px} #soundMenu .bgimg{object-fit:fill}
 #soundMenu button[data-a="fs"]{top:154px}
 #soundMenu.two{height:180px}
-/* G4 turns table: left column, under the brand panel (left side is free in G4) */
-#table{left:20px;right:auto;top:118px}
 #mission{top:112px}
 /* G6 setup tray: right of the hint note, compact cards so the bot at the rope base stays clear */
 #stage.tray-left #tray .opt{width:128px;height:146px}
@@ -484,7 +481,7 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 /* 5: panels match the SKAI paper/sticky look: warm paper, white keyline + SKAI blue outline, a strip of tape */
 #tray,#sheet,.panel,#question,#caption .txt{background:#FFFDF6;box-shadow:0 0 0 3px #fff,0 0 0 6px rgba(0,174,239,.28),var(--shadow)}
 #sheet.glow{box-shadow:0 0 0 3px #fff,0 0 0 6px rgba(255,200,61,.9),var(--shadow)}
-#tray::before,#sheet::before,#table::before,#endcard::before{content:"";position:absolute;left:34px;top:-13px;width:84px;height:22px;margin-left:0;background:rgba(0,174,239,.5);rotate:-3deg;border-radius:3px;box-shadow:0 2px 0 rgba(0,0,0,.06);pointer-events:none}
+#tray::before,#sheet::before,#bars::before,#diary::before,#compare::before,#endcard::before{content:"";position:absolute;left:34px;top:-13px;width:84px;height:22px;margin-left:0;background:rgba(0,174,239,.5);rotate:-3deg;border-radius:3px;box-shadow:0 2px 0 rgba(0,0,0,.06);pointer-events:none}
 /* 7: success badges shine; rail segments flash as they fill */
 .floatimg.shine{animation:floatUp 1.1s cubic-bezier(.2,.8,.3,1) forwards,badgeShine 1.1s ease-out}
 @keyframes badgeShine{0%{filter:brightness(1)}22%{filter:brightness(1.55) drop-shadow(0 0 14px rgba(255,214,120,.95))}100%{filter:brightness(1)}}
@@ -544,3 +541,122 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 #endcard .learnt .ln{display:flex;align-items:center;gap:12px;font:800 22px/1.2 var(--font);color:var(--navy)}
 #endcard .learnt{white-space:nowrap}
 #endcard .learnt .ln img{width:36px;height:36px;object-fit:contain;flex:none}
+
+/* 11: infographic pass — run diary, unrolling wheel bar model, moving outcomes, side-by-side, field notes from your runs, wow touches */
+/* declutter */
+#lens .tag{display:none} /* the wheel's name is enough */
+#tracker.nopts .pts{display:none} /* points box appears with the first points */
+#tray .row{justify-content:center}
+#carry{position:absolute;right:18px;top:-18px;background:#fff;border-radius:999px;padding:4px 12px 4px 4px;box-shadow:0 0 0 2px rgba(0,174,239,.28),0 4px 8px rgba(35,40,74,.12);font:800 15px/1 var(--font);color:var(--skaiInk)}
+#carry img{width:28px;height:28px}
+#caption{width:max-content} /* a centred absolute box shrinks to half the stage otherwise: lines wrap 3-deep */
+#question.right,#question.fade.right{left:auto;right:128px;transform:none;--tx:0;white-space:normal;max-width:470px;font-size:32px}
+/* run diary */
+#diary{left:20px;padding:12px 14px;display:grid;gap:6px;transition:opacity .3s,transform .35s cubic-bezier(.2,.9,.25,1.2)}
+#diary.hide{opacity:0;transform:translateX(-40px);pointer-events:none}
+#diary .dh{display:flex;align-items:center;gap:8px;font:700 15px/1 var(--chakra);letter-spacing:.14em;color:var(--skaiInk);margin:2px 0 2px 2px}
+#diary .dh img{width:30px;height:30px;object-fit:contain}
+#diary .dr{display:flex;align-items:center;gap:8px;background:#F6F3EE;border-radius:14px;padding:5px 10px 5px 6px}
+#diary .dr.ok{background:#E3F6F2;box-shadow:inset 0 0 0 3px var(--teal)}
+#diary .dr.new{animation:rowPop .55s cubic-bezier(.2,.9,.25,1.35) both}
+@keyframes rowPop{from{opacity:0;transform:translateX(-26px) scale(.9)}}
+#diary .n{width:24px;height:24px;border-radius:50%;background:var(--skaiNavy);color:#fff;font:400 14px/24px var(--fredoka);text-align:center;flex:none}
+#diary .c{display:flex;align-items:center;justify-content:center;min-width:46px;height:46px;border-radius:12px;background:#fff;padding:0 3px}
+#diary .c img{width:40px;height:40px;object-fit:contain}
+#diary .c.chg{box-shadow:0 0 0 3px #FFC83D}
+#diary .ld{display:flex;align-items:center}
+#diary .ld{gap:2px} #diary .ld img{width:30px;height:30px}
+#diary .ld em{font:400 20px/1 var(--fredoka);color:#B9B3A6;font-style:normal;padding:0 8px}
+.ar{position:relative;flex:none;width:20px;height:4px;border-radius:2px;background:#9AA3BD;margin-right:6px}
+.ar::after{content:"";position:absolute;right:-7px;top:-5px;border:7px solid transparent;border-right:0;border-left-color:#9AA3BD}
+#diary .oc{width:52px;height:46px;object-fit:contain}
+/* outcome sheet: each picture moves the way the bot did */
+#sheet .opt .mv{display:block;line-height:0}
+#sheet .o-climbed img.main{animation:oClimb 1.8s ease-in-out infinite}
+@keyframes oClimb{0%,100%{transform:translate(-5px,5px)}55%{transform:translate(6px,-6px)}}
+#sheet .o-spun img.main{animation:oSpin .45s ease-in-out infinite}
+@keyframes oSpin{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
+#sheet .o-slid img.main{animation:oSlid 2s cubic-bezier(.55,0,.9,.5) infinite}
+@keyframes oSlid{0%,30%{transform:translate(4px,-4px)}75%,88%{transform:translate(-10px,9px)}100%{transform:translate(4px,-4px)}}
+#sheet .o-wrongway img.main{animation:oWrong 2.2s ease-in-out infinite}
+@keyframes oWrong{0%,100%{transform:translateX(5px)}50%{transform:translateX(-10px)}}
+#sheet .o-stopped img.main{animation:oStop 2.4s ease-out infinite}
+@keyframes oStop{0%{transform:translate(-7px,6px)}40%{transform:translate(3px,-3px)}46%{transform:translate(3px,-3px) rotate(-3deg)}52%{transform:translate(3px,-3px) rotate(3deg)}58%,100%{transform:translate(3px,-3px)}}
+/* FOUND sticker: a picture equation (what you set → what happened) drops onto the caption */
+#caption.found .txt{position:relative;padding-left:22px}
+#caption .fnd{position:absolute;left:-26px;top:-92px;width:auto;height:auto;margin:0;display:flex;flex-direction:column;align-items:center;gap:6px;background:#FFF1D2;border-radius:18px;padding:10px 14px 12px;rotate:-6deg;box-shadow:0 0 0 3px #fff,0 10px 18px rgba(35,40,74,.22);animation:stickerDrop .6s .15s cubic-bezier(.2,.9,.3,1.35) both}
+#caption .fnd b{position:static;transform:none;background:var(--teal);color:#fff;font:700 14px/1 var(--chakra);letter-spacing:.16em;padding:5px 10px 4px;border-radius:4px}
+#caption .fnd .eq{display:flex;align-items:center;gap:8px}
+#caption .fnd .eq img{width:58px;height:58px;object-fit:contain}
+#caption .fnd .eq i{position:relative;width:20px;height:4px;border-radius:2px;background:var(--skaiOrange)}
+#caption .fnd .eq i::after{content:"";position:absolute;right:-7px;top:-5px;border:7px solid transparent;border-right:0;border-left-color:var(--skaiOrange)}
+@keyframes stickerDrop{from{opacity:0;transform:translateY(-60px) rotate(-18deg) scale(1.35)}to{opacity:1;transform:none}}
+/* title cards: letters rise one by one; the route draws itself stop by stop; "you are here" pings */
+.titlecard .tc-name span{display:inline-block;animation:letterIn .55s cubic-bezier(.2,.9,.3,1.4) both;animation-delay:calc(.12s + var(--c)*.035s)}
+@keyframes letterIn{from{opacity:0;transform:translateY(42px) rotate(8deg) scale(.6)}}
+.titlecard .tc-map{animation:optIn .45s .45s cubic-bezier(.2,.9,.25,1.2) both}
+.titlecard .tc-map .route .stop,.titlecard .tc-map .route .rs{animation:optIn .35s cubic-bezier(.2,.9,.25,1.3) both;animation-delay:calc(.7s + var(--k)*.08s)}
+.titlecard .tc-map .fixes{animation:optIn .4s 1.6s both}
+.route .stop.cur::after{content:"";position:absolute;left:50%;top:38px;width:80px;height:80px;margin:-40px 0 0 -40px;border-radius:50%;border:3px solid var(--skaiOrange);opacity:0;animation:ping 1.4s 1.5s ease-out infinite}
+@keyframes ping{0%{opacity:.9;transform:scale(.6)}100%{opacity:0;transform:scale(1.5)}}
+/* G4 bar model: once around the wheel, one block per turn (same colours as the strips on the cable) */
+#bars{left:20px;top:118px;padding:14px 18px 16px;min-width:300px}
+#bars .bh{display:flex;align-items:center;gap:8px;font:700 15px/1 var(--chakra);letter-spacing:.12em;color:var(--skaiInk)}
+#bars .bh img{width:34px;height:34px;object-fit:contain}
+#bars .bgp{margin-top:12px}
+#bars .bgp+.bgp{padding-top:12px;border-top:2px dashed #E6DFD2}
+#bars .eq{display:flex;align-items:center;gap:8px;font:400 30px/1 var(--fredoka);color:var(--skaiNavy)}
+#bars .eq img{width:48px;height:48px;object-fit:contain}
+#bars .eq em{font-style:normal;min-width:48px;text-align:center;background:#FFF0BD;border-radius:10px;padding:5px 8px;color:var(--skaiOrange)}
+#bars .eq em.q{color:#B9B3A6;background:#F3F0EA}
+#bars .eq em.land{animation:pop .5s}
+#bars .blocks{display:flex;gap:3px;margin-top:10px;min-height:34px}
+#bars .blocks i{height:34px;border-radius:8px;display:grid;place-items:center;font:400 18px/1 var(--fredoka);color:#fff;font-style:normal;box-shadow:inset 0 -3px 0 rgba(0,0,0,.14)}
+#bars .blocks i.land{animation:pop .45s}
+#bars .tot{margin-top:8px;font:800 22px/1 var(--font);color:var(--navy)}
+#bars .tot b{font:400 26px/1 var(--fredoka);color:var(--skaiOrange)}
+/* S4 side by side */
+#compare{left:50%;top:104px;transform:translateX(-50%);--tx:-50%;display:flex;align-items:stretch;padding:16px 22px 18px}
+#compare .cx{width:350px;display:flex;flex-direction:column;align-items:center;gap:6px}
+#compare .ct{font:700 16px/1 var(--chakra);letter-spacing:.16em;color:var(--skaiInk)}
+#compare svg{width:320px;height:170px;overflow:visible}
+#compare .rope{stroke:#3B4058;stroke-width:7;fill:none;stroke-linecap:round}
+#compare .rope.flow{stroke-dasharray:16 9;animation:ropeFlow .8s linear infinite}
+@keyframes ropeFlow{to{stroke-dashoffset:25}}
+#compare .stand{fill:#9AA0B5}
+#compare .rim{fill:#5C6385;stroke:#23284A;stroke-width:4}
+#compare .spin line{stroke:#E8ECF6;stroke-width:5;stroke-linecap:round}
+#compare .spin{animation:spinW 1.6s linear infinite}
+@keyframes spinW{to{transform:rotate(360deg)}}
+#compare .hub{fill:#FFC83D}
+#compare .ride{animation:rideRope 3.4s cubic-bezier(.45,0,.55,1) infinite}
+@keyframes rideRope{0%{transform:translate(52px,136px);opacity:0}8%{opacity:1}80%{transform:translate(250px,66px);opacity:1}92%,100%{transform:translate(250px,66px);opacity:0}}
+#compare .body{fill:#FFC83D;stroke:#23284A;stroke-width:3} #compare .eye{fill:#23284A} #compare .hang{stroke:#23284A;stroke-width:4}
+#compare .cvs{width:2px;margin:6px 16px;background:repeating-linear-gradient(#E6DFD2 0 8px,transparent 8px 14px)}
+#compare .cl{display:flex;gap:10px;font:800 19px/1 var(--font)}
+#compare .cl span{display:flex;align-items:center;gap:6px;padding:7px 12px 7px 8px;border-radius:999px;white-space:nowrap}
+#compare .cl b{font:400 21px/1 var(--fredoka)}
+#compare .st{background:#EEF1F8;color:var(--skaiNavy)} #compare .st img{width:28px;height:28px;object-fit:contain}
+#compare .mv{background:#FFE9DF;color:var(--skaiOrange)}
+#compare .mv i{width:24px;height:14px;background:linear-gradient(var(--skaiOrange) 0 0) 0 1px/16px 3px no-repeat,linear-gradient(var(--skaiOrange) 0 0) 6px 6px/18px 3px no-repeat,linear-gradient(var(--skaiOrange) 0 0) 2px 11px/14px 3px no-repeat;animation:speed .6s linear infinite}
+@keyframes speed{50%{transform:translateX(3px)}}
+/* G5 field notes from your runs */
+.bp-tile svg{height:170px}
+.bp-runs .bp-r img{width:56px;height:56px}
+.bp-runs{display:grid;gap:6px;margin-top:12px}
+.bp-r{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border-radius:14px;padding:6px 10px;opacity:.5;animation:rowIn .4s both;animation-delay:calc(1.5s + var(--i)*.5s + var(--k)*.22s)}
+@keyframes rowIn{from{opacity:0;transform:translateY(14px)}}
+.bp-r.ok{opacity:1;background:rgba(255,255,255,.2);box-shadow:inset 0 0 0 2px #FFC83D}
+.bp-r img{width:46px;height:46px;object-fit:contain}
+.bp-r .ar{background:#9FD8FF} .bp-r .ar::after{border-left-color:#9FD8FF}
+/* end card: learnings stick onto a notebook page one by one; teaser is one line next to Play again */
+#endcard .learnt{white-space:nowrap;background:#FFFDF6 repeating-linear-gradient(transparent 0 33px,#DCE7F5 33px 35px);background-position:0 30px;border-radius:12px;padding:10px 16px 12px 26px;box-shadow:inset 3px 0 0 #F3A0A0,inset 0 0 0 2px #EEE7DA}
+#endcard .learnt .ln{animation:stickIn .5s cubic-bezier(.2,.9,.3,1.4) both;animation-delay:calc(1.1s + var(--i)*.38s)}
+@keyframes stickIn{from{opacity:0;transform:translateX(46px) rotate(4deg) scale(.9)}}
+#endcard .ft{display:flex;align-items:center;gap:16px;margin-top:18px}
+#endcard .ft .btn{flex:none;white-space:nowrap}
+#endcard .kit{margin-top:0;padding:8px 14px 8px 8px;font:800 18px/1.2 var(--font);gap:10px}
+#endcard .kit .teaser,#endcard .kit img{width:112px;height:70px;border-radius:10px;object-fit:cover}
+@media (prefers-reduced-motion: reduce){ #sheet .opt img.main,#compare .ride,#compare .spin,#compare .rope.flow,.titlecard .tc-name span,.route .stop.cur::after{animation:none!important} }
+#tray.ask{align-items:center}
+#tray .tq{display:flex;align-items:center;gap:12px;font:900 30px/1.15 var(--font);color:var(--navy);padding:0 8px;white-space:nowrap}
