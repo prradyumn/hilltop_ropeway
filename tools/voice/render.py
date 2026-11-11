@@ -55,6 +55,8 @@ LINES = {
     "p_wheel": "Wheel. You can swap it for a different wheel.",
     "p_load": "Load. Everything the bot carries.",
     "p_tape": "Tape. It shows how far the bot goes.",
+    # SKAI template pass: the end card recap (what you did -> the big idea)
+    "end_recap": "You tested the bot, watched what it did, and changed one thing at a time, until it reached the top. Test it, watch what it does, change one thing.",
 }
 
 # optional 4th arg: comma-separated ids to render (default: all). KOKORO_DIR: where the model files live (default: here)

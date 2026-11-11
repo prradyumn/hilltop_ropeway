@@ -127,7 +127,7 @@ function maybeSunrise(){ if(S.sunrise||S.clock<380) return; S.sunrise=true; cons
 async function banner(eyebrow,name,opt){ maybeSunrise(); await titleCard(eyebrow,name,'',opt); }
 
 /* ================= UI pieces ================= */
-function clearUI(){ clearNudges(); UI.innerHTML=''; PINS.innerHTML=''; pins.length=0; $('#dim').classList.remove('on'); spotOff(); }
+function clearUI(){ clearNudges(); if(lockA) voLock(null); UI.innerHTML=''; PINS.innerHTML=''; pins.length=0; $('#dim').classList.remove('on'); spotOff(); }
 /* ---------- nudges: glow + pulse on what to tap, tips only the first time ---------- */
 const NG={seen:new Set(), active:[]};
 function stageRect(el){ const r=el.getBoundingClientRect(), s=stage.getBoundingClientRect(); return {x:(r.left-s.left)/scale, y:(r.top-s.top)/scale, w:r.width/scale, h:r.height/scale}; }
@@ -137,7 +137,7 @@ function makeTip(el,text,place='top',arrow=true){ const t=html('div','tip '+plac
   x=Math.max(16,Math.min(SW-tw-16,x)); y=Math.max(12,y); t.style.left=x+'px'; t.style.top=y+'px'; return t; }
 function nudge(el,{tip=null,key=null,delay=0,round=false,place='top',ring=true,arrow=true}={}){ if(!el) return ()=>{}; let tipEl=null, done=false;
   const showTip=()=>{ if(done||!el.isConnected) return; if(document.querySelector('.tip:not(.exit)')){ setTimeout(showTip,400); return; } tipEl=makeTip(el,tip,place,arrow); }; // one tip at a time
-  const showIt=()=>{ if(done||!el.isConnected) return; if(ring){ el.classList.add('nudge'); if(round) el.classList.add('round'); } if(tip&&(!key||!NG.seen.has(key))) showTip(); };
+  const showIt=()=>{ if(done||!el.isConnected) return; if(stage.classList.contains('vo-lock')){ setTimeout(showIt,300); return; } if(ring){ el.classList.add('nudge'); if(round) el.classList.add('round'); } if(tip&&(!key||!NG.seen.has(key))) showTip(); };
   const id=setTimeout(showIt,delay); const clear=()=>{ if(done) return; done=true; clearTimeout(id); el.classList.remove('nudge','round'); tipEl&&tipEl.remove(); if(key&&tipEl) NG.seen.add(key); el.removeEventListener('click',clear,true); };
   el.addEventListener('click',clear,true); NG.active.push(clear); return clear; }
 function clearNudges(){ NG.active.splice(0).forEach(f=>f()); document.querySelectorAll('.tip').forEach(t=>t.remove()); }
@@ -171,19 +171,31 @@ const VO={'6:15 am. Your class is first in line.':'s1_queue','No ride until the 
   'Tower 1 checked. The way the wheel turns sets which way the bot goes.':'f_t1','Tower 2 checked. On the steep cable, the grooved wheel with a band did not slip.':'f_t2',
   'Tower 3 checked. With only the camera, the bot was light enough to climb.':'f_t3','Tower 4 checked. Each turn moves the bot the distance around its wheel. The bigger wheel goes farther.':'f_t4','Which sentence is true?':'g5_q','Grip is what stops the slipping.':'g5_end',
   'At Tower 2, the big smooth wheel slipped too.':'g5_bigslip','At Tower 2, the wheel was already spinning fast. It still slipped.':'g5_fastslip',
-  'Watch which way the top of the wheel moves.':'h_g1','Look at where the wheel touches the cable.':'h_g2','Read the mission card again.':'h_g3','How far does one turn go?':'h_g4','Check all three: turn, wheel, load.':'h_g6'};
+  'Watch which way the top of the wheel moves.':'h_g1','Look at where the wheel touches the cable.':'h_g2','Read the mission card again.':'h_g3','How far does one turn go?':'h_g4','Check all three: turn, wheel, load.':'h_g6','You tested the bot, watched what it did, and changed one thing at a time, until it reached the top. Test it, watch what it does, change one thing.':'end_recap'};
 let voEl=null, lastLine='';
 const PULLEY_LINE='A wheel with a groove: a dip round its edge where the rope sits.';
 // auto-narration: only lines we have a recording for (never browser TTS unprompted), after audio is unlocked by a tap
-function narrate(text){ const t=String(text).replace(/<[^>]+>/g,'').trim(); if(!VO[t]||!ac_ok()) return; setTimeout(()=>speak(t),250); }
+function narrate(text){ const t=String(text).replace(/<[^>]+>/g,'').trim(); if(!VO[t]||!ac_ok()||isMuted()) return; voLock(true,1200); clearTimeout(narrT); narrT=setTimeout(()=>speak(t,null,{auto:true}),250); }
+/* narration-locked interaction (SKAI template §11): while an instruction is read out the first time, the choices/RUN/NEXT are
+   lightly dimmed and not tappable, so a stray tap can't skip it. Unlocks on end/pause/error/mute (or a safety cap), then a short
+   "ready" pulse. A replay from the sound note never locks. Nudge glows wait for the unlock. */
+let lockA=null, voLockT=0, narrT=0;
+function voLock(on,cap=14000){ clearTimeout(voLockT); const was=stage.classList.contains('vo-lock');
+  if(on){ if(!lockA) lockA='pending'; stage.classList.add('vo-lock'); voLockT=setTimeout(()=>voLock(false),cap); return; }
+  if(on===null) clearTimeout(narrT); lockA=null; stage.classList.remove('vo-lock'); if(was&&on!==null){ readyPulse(); armIdleHint(); } }
+// "you can tap now": one soft pop on what just unlocked. Additive (composite:'add'), so pinned/positioned elements keep their place.
+const LOCKED='#tray .opt,#tray .stepper,#rules .rule,#run:not(.hide),#pins button.pin,#caption .next,#nextWheel';
+function readyPulse(){ if(matchMedia('(prefers-reduced-motion: reduce)').matches) return; document.querySelectorAll(LOCKED).forEach(e=>{ try{ e.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:560,easing:'cubic-bezier(.3,1.4,.5,1)',composite:'add'}); }catch(err){} }); }
 const ac_ok=()=>{ try{ return navigator.userActivation?navigator.userActivation.hasBeenActive:true; }catch(e){ return true; } };
-function speak(t,id){ t=t.replace(/<[^>]+>/g,'').trim(); const key=id||VO[t]; try{ speechSynthesis.cancel(); }catch(e){} if(voEl){ voEl.pause(); voEl=null; }
-  if(isMuted()) return; unlock();
+function speak(t,id,{auto=false}={}){ t=t.replace(/<[^>]+>/g,'').trim(); const key=id||VO[t]; try{ speechSynthesis.cancel(); }catch(e){} if(voEl){ voEl.pause(); voEl=null; }
+  if(!auto&&lockA) voLock(false); if(isMuted()){ if(lockA) voLock(false); return; } unlock();
   const fallback=()=>{ try{ const u=new SpeechSynthesisUtterance(t); u.rate=0.95; u.onend=()=>mood.duck(false); mood.duck(true); speechSynthesis.speak(u); }catch(e){} };
   if(!key){ fallback(); return; }
   const a=new Audio(`assets/voice/${key}.mp3`); voEl=a; mood.duck(true); const talk=on=>document.querySelectorAll('#caption .spk,#question .spk').forEach(e=>e.classList.toggle('talking',on)); talk(true);
-  a.onended=()=>{ talk(false); if(voEl===a){ voEl=null; mood.duck(false); } }; a.onpause=()=>talk(false); a.onerror=()=>{ if(voEl===a){ voEl=null; fallback(); } };
-  a.play().catch(()=>{ if(voEl===a){ voEl=null; fallback(); } }); }
+  const rel=()=>{ if(lockA===a) voLock(false); };
+  if(auto){ lockA=a; voLock(true,14000); a.onloadedmetadata=()=>{ if(lockA===a&&isFinite(a.duration)) voLock(true,(a.duration+1)*1000); }; }
+  a.onended=()=>{ talk(false); rel(); if(voEl===a){ voEl=null; mood.duck(false); } }; a.onpause=()=>{ talk(false); rel(); }; a.onerror=()=>{ rel(); if(voEl===a){ voEl=null; fallback(); } };
+  a.play().catch(()=>{ rel(); if(voEl===a){ voEl=null; fallback(); } }); }
 // found: an icon of what worked at this tower + a FOUND stamp, so the finding is something to look at, not only to read
 function caption(text,{next=true,found=null}={}){ lastLine=text; narrate(text); const old=$('#caption'); if(old) old.remove(); const c=html('div','fade'+(found?' found':'')); c.id='caption';
   c.innerHTML=`<div class="txt">${found?`<span class="fnd"><b>FOUND</b><span class="eq">${img(found[0])}<i></i>${img(found[1])}</span></span>`:''}<button class="spk" aria-label="Read aloud">${img('skai_icon_speaker')}</button><span>${text}</span></div>`+(next?`<button class="btn next" aria-label="Next">NEXT</button>`:'');
@@ -233,7 +245,14 @@ function buildRun(){ runBtn=html('button','btn hide'); runBtn.id='run'; runBtn.s
   hintBtn=html('button','imgbtn hide'); hintBtn.id='hint'; hintBtn.setAttribute('aria-label','Hint'); hintBtn.innerHTML=img('skai_note_hint')+'<span class="cost">+2 min</span>'; UI.appendChild(hintBtn);
   hintBtn.onclick=async()=>{ if(!S.hintText||S.hintOn) return; S.hintOn=true; sfx.tick(); const b=html('div','fade'); b.id='hintBubble'; b.textContent=S.hintText; UI.appendChild(b); speak(S.hintText); log('hint_requested',{at:S.chapter}); addClock(2,2).catch(()=>{}); setTimeout(()=>{ b.remove(); S.hintOn=false; },4200); }; }
 let runNudge=null;
-function runState(on,enabled=true,label='RUN'){ if(!runBtn) buildRun(); runNudge&&runNudge(); runNudge=null; if(on&&enabled) runNudge=nudge(runBtn,{delay:2600,tip:'Press RUN',key:'run',place:'left'}); runBtn.classList.toggle('hide',!on); runBtn.classList.toggle('off',!enabled); runBtn.querySelector('.lbl').textContent=label; hintBtn.classList.toggle('hide',!on||!S.hintText||!S.hintReady); } // hint note appears after the child's first try at a step (still only on request)
+function runState(on,enabled=true,label='RUN'){ if(!runBtn) buildRun(); runNudge&&runNudge(); runNudge=null; if(on&&enabled) runNudge=nudge(runBtn,{delay:2600,tip:'Press RUN',key:'run',place:'left'}); runBtn.classList.toggle('hide',!on); runBtn.classList.toggle('off',!enabled); runBtn.querySelector('.lbl').textContent=label; hintBtn.classList.toggle('hide',!on||!S.hintText||!S.hintReady); on?armIdleHint():clearTimeout(idleT); }
+/* hint note appears after the child's first try at a step, or after ~8 s with no tap while setting up (SKAI template §6).
+   It only appears: the hint itself is still given on request (+2 min). The idle clock starts after any narration ends. */
+let idleT=0;
+function armIdleHint(){ clearTimeout(idleT); idleT=0; if(!hintBtn||!runBtn||S.hintReady||!S.hintText||runBtn.classList.contains('hide')) return;
+  idleT=setTimeout(()=>{ idleT=0; if(S.hintReady||!S.hintText||runBtn.classList.contains('hide')) return; if(stage.classList.contains('vo-lock')){ armIdleHint(); return; }
+    S.hintReady=true; hintBtn.classList.remove('hide'); hintBtn.classList.add('arrive'); log('hint_offered',{at:S.chapter,why:'idle'}); },8000); }
+document.addEventListener('pointerdown',()=>{ if(idleT) armIdleHint(); },{passive:true});
 
 // tray
 function tray({options, selected, multi=false, onPick, tabs, carry, custom, onRender}){ let t=$('#tray'); if(t) t.remove(); t=html('div','fade'); t.id='tray';
@@ -701,10 +720,14 @@ async function G7(){ S.chapter='G7'; S.hintText=''; runState(false); show(H.bann
   try{ await tween(g,{d:total},9,ease.io); } finally { rideFollow=null; }
   const shot=snapPostcard(); sfx.shutter(); flash(0.85); await wait(500);
   await camPath([{x:18,y:12,zoom:28,rot:0,d:2.2,ease:'power3.inOut'}]); cine(false);
+  /* what you did → what you found out → the big idea (SKAI template: the end reinforces the learning, not only "well done") */
+  const nRuns=S.log.filter(e=>e.ev==='run_started'||e.ev==='prediction').length;
   const card=html('div','panel fade'); card.id='endcard'; card.style.position='absolute';
   card.innerHTML=`<div class="tk"><div class="postcard"><div class="pc-photo"></div><div class="pc-cap">Hilltop Ropeway · Left at ${fmt(S.clock)}</div></div>${onTime?img('ui_star_burst','burst'):''}</div>
     <div><h2>${onTime?'On time. Your class is riding up.':'Your class is riding up.'}</h2>
+    <div class="did">${img('ui_replay')}<span>${nRuns>1?`You tested the bot ${nRuns} times and changed its turn, wheel and load.`:'You tested the bot and changed its turn, wheel and load.'}</span></div>
     <div class="learnt"><b>What you found out</b>${LEARNT.map(([ic,t],i)=>`<div class="ln" style="--i:${i}">${img(ic)}<span>${t}</span></div>`).join('')}</div>
+    <div class="big" style="--i:${LEARNT.length}"><b>THE BIG IDEA</b><span>${BIG_IDEA}</span><button class="spk" aria-label="Read aloud">${img('skai_icon_speaker')}</button></div>
     <div class="ft"><button class="btn ghost" id="again">Play again</button><div class="kit"><video class="teaser" muted playsinline preload="auto" poster="assets/video/tarzan_teaser.webp" src="assets/video/tarzan_teaser.mp4" aria-label="Tarzan Bot kit"></video><span>Next class: Tarzan Bot on a real rope.</span></div></div></div>`;
   UI.appendChild(card); card.querySelector('.pc-photo').appendChild(shot.canvas);
   { const tv=card.querySelector('.teaser'), toImg=()=>{ const i=new Image(); i.src=A('ui_kit_bridge'); i.alt=''; tv.replaceWith(i); }; // teaser plays once, holds its last frame
@@ -712,11 +735,15 @@ async function G7(){ S.chapter='G7'; S.hintText=''; runState(false); show(H.bann
   { const pc=card.querySelector('.postcard'), R0=stageRect(pc); // FLIP: the photo flies from where the gondola was into the card
     pc.animate([{transform:`translate(${shot.x-(R0.x+R0.w/2)}px,${shot.y-(R0.y+R0.h/2)}px) scale(.3) rotate(0deg)`,opacity:.2},{transform:'rotate(-4deg)',opacity:1}],{duration:900,easing:'cubic-bezier(.2,.9,.25,1.1)'}); }
   LEARNT.forEach((_,i)=>setTimeout(()=>sfx.pop(),1100+i*380)); // each learning sticks onto the page with a soft pop
+  card.querySelector('.big .spk').onclick=()=>speak(END_LINE,'end_recap'); lastLine=END_LINE;
+  setTimeout(()=>{ if(card.isConnected) narrate(END_LINE); },1100+LEARNT.length*380+300); // the recap is read once the page is filled in
   if(onTime) sfx.fanfare(); const gpp=gondolaPos(); addFX('vfx_confetti',gpp[0],gpp[1]+1.5,8,{fps:10}); addFX('vfx_arrival_sparkle',gpp[0],gpp[1]+1,5); log('mission_end',{towers:world.lit.filter(Boolean).length+(world.topLit?1:0),points:S.points,on_time:onTime,depart_time:fmt(S.clock)});
   nudge($('#again'),{delay:3400}); await click($('#again')); play(0);
 }
 
 // end-card recap: one line per learning objective the child met (pulley, direction, grip, load, turns)
+const BIG_IDEA='Test it, watch what it does, change one thing.';
+const END_LINE='You tested the bot, watched what it did, and changed one thing at a time, until it reached the top. Test it, watch what it does, change one thing.';
 const LEARNT=[['ui_pulley','A turning wheel moves itself along a still rope.'],['ui_tab_direction','The wheel’s turn sets the way.'],
   ['ui_wheel_band','Steeper rope, more grip.'],['ui_tab_load','Too much load: the bot stalls.'],['ui_one_turn','1 turn = once around the wheel.']];
 /* G7 postcard: copy a crop of the live world canvas around the gondola (sky is CSS behind the canvas, so paint it in first).
