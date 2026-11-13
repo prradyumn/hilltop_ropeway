@@ -105,16 +105,24 @@ H.notebook.querySelector('img').src=A('ui_notebook'); H.mission.querySelector('.
 const fmt=m=>`${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
 function paintClock(){ H.clock.querySelector('.time').textContent=fmt(S.clock); applySky(); }
 const show=(el,on=true)=>el.classList.toggle('hide',!on);
+/* contextual HUD (declutter): the clock and progress rail show only while they can change (tower set-ups, runs).
+   Story beats, title cards (their route already shows progress), Say the Rule and the ride hide them. */
+const hudOff=(on=true)=>stage.classList.toggle('hudoff',on);
 // trackLit: what the HUD shows. It lags world.lit on purpose: a tower's icon lights when its spark lands (sparkTo)
 const trackLit=[false,false,false,false]; let trackTop=false;
 function paintTracker(popIdx=-1){ const n=trackLit.filter(Boolean).length+(trackTop?1:0); H.tracker.querySelectorAll('.segs path').forEach((p,k)=>{ const was=p.classList.contains('on'), on=k<n*2; p.classList.toggle('on',on); if(on&&!was&&popIdx>=0){ p.classList.add('flash'); setTimeout(()=>p.classList.remove('flash'),180+k*40); } });
-  const c=H.tracker.querySelector('.count'); c.textContent=`${n}/5`; H.tracker.querySelector('.pts b').textContent=S.points; H.tracker.classList.toggle('nopts',!S.points); if(popIdx>=0){ c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop'); } }
+  const c=H.tracker.querySelector('.count'); c.textContent=`${n}/5`; H.tracker.querySelector('.pts b').textContent=S.points; flashPts(); if(popIdx>=0){ c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop'); } }
+// points box: appears for a moment when points are won, then hides (points are a reward, not something to keep reading)
+let ptsSeen=0, ptsT=0;
+function flashPts(){ if(S.points>ptsSeen){ clearTimeout(ptsT); H.tracker.classList.remove('nopts'); ptsT=setTimeout(()=>H.tracker.classList.add('nopts'),2800); } else if(!ptsT||S.points<ptsSeen) H.tracker.classList.add('nopts'); ptsSeen=S.points; }
 // a spark flies (arcing) from a stage point into tracker slot idx (0-3 towers, 4 = star)
 function sparkTo(sx,sy,idx){ const n=trackLit.filter(Boolean).length+(trackTop?1:0), t=H.tracker.querySelectorAll('.segs path')[Math.min(9,n*2+1)]; /* next pair of rail segments */ if(!t) return Promise.resolve(); const R=stageRect(t); const e=html('div','spark'); e.style.left=sx+'px'; e.style.top=sy+'px'; UI.appendChild(e);
   const dx=R.x+R.w/2-sx, dy=R.y+R.h/2-sy, T=(x,y,s)=>`translate(-50%,-50%) translate(${x}px,${y}px) scale(${s})`;
   return P(done=>{ const an=e.animate([{transform:T(0,0,.4),opacity:0},{transform:T(0,-20,1.3),opacity:1,offset:.14},{transform:T(dx*.45,dy*.35-140,1),offset:.55},{transform:T(dx,dy,.6),opacity:1}],{duration:850,easing:'cubic-bezier(.45,0,.35,1)'});
     an.onfinish=()=>{ e.remove(); done(); }; return ()=>{ an.cancel(); e.remove(); }; }); }
-async function addClock(m,kind){ if(kind){ { const r=stageRect(H.clock); floatAt(kind===2?'ui_badge_2min':'ui_badge_4min',r.x+r.w/2,r.y+r.h+24); } sfx.tock(); }
+// "First ride 7:00" shows under the clock only when time is added (and during the mission brief): that is when the deadline matters
+let dueT=0; const showDue=(ms=3400)=>{ H.clock.classList.add('duev'); clearTimeout(dueT); if(ms) dueT=setTimeout(()=>H.clock.classList.remove('duev'),ms); };
+async function addClock(m,kind){ showDue(); if(kind){ { const r=stageRect(H.clock); floatAt(kind===2?'ui_badge_2min':'ui_badge_4min',r.x+r.w/2,r.y+r.h+24); } sfx.tock(); }
   for(let i=0;i<m;i++){ S.clock++; paintClock(); await wait(90); } }
 function floatAt(n,x,y,w=150){ const e=html('img','floatimg'+(/^ui_badge_\d+$/.test(n)?' shine':'')); e.src=A(n); e.style.left=x+'px'; e.style.top=y+'px'; e.style.width=w+'px'; e.style.marginLeft=(-w/2)+'px'; UI.appendChild(e); setTimeout(()=>e.remove(),1200); }
 function botScreen(b=bot){ const c=botBodyCenter(b); return scr(c.x,c.y); }
@@ -124,7 +132,8 @@ function maybeSunrise(){ if(S.sunrise||S.clock<380) return; S.sunrise=true; cons
   const an=r.animate([{opacity:0,transform:'translate(-50%,-50%) scale(1.6) rotate(-6deg)'},{opacity:1,offset:.3},{opacity:.85,offset:.7},{opacity:0,transform:'translate(-50%,-50%) scale(2.3) rotate(8deg)'}],{duration:4200,easing:'ease-in-out'});
   an.onfinish=()=>r.remove(); }
 // chapter title card only: the old navy banner pill that followed it was hidden again before the child could read it (declutter)
-async function banner(eyebrow,name,opt){ maybeSunrise(); await titleCard(eyebrow,name,'',opt); }
+// the HUD stays off while the card's route shows "you are here", then slides back in as the tower's set-up starts
+async function banner(eyebrow,name,opt){ maybeSunrise(); hudOff(true); await titleCard(eyebrow,name,'',opt); hudOff(false); }
 
 /* ================= UI pieces ================= */
 function clearUI(){ clearNudges(); if(lockA) voLock(null); UI.innerHTML=''; PINS.innerHTML=''; pins.length=0; $('#dim').classList.remove('on'); spotOff(); }
@@ -146,17 +155,17 @@ function clearTrayTip(){ document.querySelectorAll('.tip').forEach(t=>{ if(t.tex
    bot → Tower 1..4 → Top (rope + camera mount) → gondola at 7:00. Same 5 checks as the progress rail.
    cur = the stop being worked on (-1: none, mission brief). Stops before cur are done. */
 const FIX={dir:['ui_tab_direction','Turn'],wheel:['ui_tab_wheel','Wheel'],load:['ui_tab_load','Load'],turns:['ui_one_turn','Turns']};
-function routeHTML(cur=-1){ const st=[1,2,3,4].map(n=>({ic:n-1<=cur&&cur>=0?'ui_tower_on':'ui_tower_off',l:String(n)})).concat([{ic:'ui_mount_success',l:'Top'}]);
+function routeHTML(cur=-1,labels=[]){ const L=t=>labels.includes(t)?`<b>${t}</b>`:''; const st=[1,2,3,4].map(n=>({ic:n-1<=cur&&cur>=0?'ui_tower_on':'ui_tower_off',l:String(n)})).concat([{ic:'ui_mount_success',l:'Top'}]);
   let k=0; const K=()=>` style="--k:${k++}"`;
-  return `<div class="route"><span class="stop bot"${K()}>${img('ui_bot_avatar')}<b>Bot</b></span>`+
-    st.map((s,i)=>`<i class="rs ${i<cur?'done':''}"${K()}></i><span class="stop ${i<cur?'done':i===cur?'cur':''}"${K()}>${img(s.ic)}<b>${s.l}</b></span>`).join('')+
-    `<i class="rs"${K()}></i><span class="stop ride"${K()}>${img('ui_gondola')}<b>7:00</b></span></div>`; }
+  return `<div class="route"><span class="stop bot"${K()}>${img('ui_bot_avatar')}${L('Bot')}</span>`+
+    st.map((s,i)=>`<i class="rs ${i<cur?'done':''}"${K()}></i><span class="stop ${i<cur?'done':i===cur?'cur':''}"${K()}>${img(s.ic)}${L(s.l)}</span>`).join('')+
+    `<i class="rs"${K()}></i><span class="stop ride"${K()}>${img('ui_gondola')}${L('7:00')}</span></div>`; }
 const fixHTML=(keys,lead='YOU FIX')=>`<div class="fixes"><small>${lead}</small>${keys.map(k=>`<span>${img(FIX[k][0])}<b>${FIX[k][1]}</b></span>`).join('')}</div>`;
 /* ---------- cinematic chapter card ---------- */
 // route: where this chapter sits on the mission route; fix: the one thing the child changes here (named, never the answer)
 async function titleCard(eyebrow,name,sub='',{route=null,fix=null,lead}={}){ const map=route!==null;
   const c=html('div','titlecard'+(map?' map':''),`<div class="tc-eb">${eyebrow}</div><div class="tc-name">${[...name].map((ch,i)=>ch===' '?' ':`<span style="--c:${i}">${ch}</span>`).join('')}</div>${sub?`<div class="tc-sub">${sub}</div>`:''}${map?`<div class="tc-map">${routeHTML(route)}${fix?fixHTML(fix,lead):''}</div>`:'<i class="tc-line"></i>'}`); UI.appendChild(c); sfx.whoosh();
-  await wait(map?2900:1700); c.classList.add('out'); await wait(450); c.remove(); }
+  try{ await wait(map?2900:1700); c.classList.add('out'); await wait(450); } finally { c.remove(); } }
 function cloudPass(){ const w=html('div','cpass'); ['cloud_04','cloud_01','cloud_06'].forEach((n,i)=>{ const im=new Image(); im.src=(window.PACK&&window.PACK[n])||''; im.className='cp c'+i; w.appendChild(im); }); stage.appendChild(w); setTimeout(()=>w.remove(),2600); }
 /* ---------- cloud wipe transition ---------- */
 async function cloudWipe(mid){ const w=html('div','wipe'); ['cloud_01','cloud_05','cloud_03','cloud_06','cloud_02'].forEach((n,i)=>{ const im=new Image(); im.src=(window.PACK&&window.PACK[n])||''; im.className='wc w'+i; w.appendChild(im); }); stage.appendChild(w); sfx.whoosh();
@@ -168,10 +177,11 @@ const VO={'6:15 am. Your class is first in line.':'s1_queue','No ride until the 
   'In the bot, what stays still?':'s4_q','The rope stays still, so the wheel moves itself along it.':'s4_rope',
   'How many turns to the flag?':'g4_q','The flag is 80 cm up. How many turns?':'g4_q80','The flag is 90 cm up. How many turns?':'g4_q90','Turn the wheel. How far does the bot go?':'g4_watch',
   'Which way should the wheel turn?':'g1_q','Steeper cable. Which wheel will get the bot up?':'g2_q','What should the bot carry today?':'g3_q','Set up the new bot to climb the rope.':'g6_q',
-  'Tower 1 checked. The way the wheel turns sets which way the bot goes.':'f_t1','Tower 2 checked. On the steep cable, the grooved wheel with a band did not slip.':'f_t2',
-  'Tower 3 checked. With only the camera, the bot was light enough to climb.':'f_t3','Tower 4 checked. Each turn moves the bot the distance around its wheel. The bigger wheel goes farther.':'f_t4','Which sentence is true?':'g5_q','Grip is what stops the slipping.':'g5_end',
+  'The way the wheel turns sets which way the bot goes.':'f_t1','On the steep cable, the grooved wheel with a band did not slip.':'f_t2',
+  'With only the camera, the bot was light enough to climb.':'f_t3','Each turn moves the bot the distance around its wheel. The bigger wheel goes farther.':'f_t4','Which sentence is true?':'g5_q','Grip is what stops the slipping.':'g5_end',
   'At Tower 2, the big smooth wheel slipped too.':'g5_bigslip','At Tower 2, the wheel was already spinning fast. It still slipped.':'g5_fastslip',
-  'Watch which way the top of the wheel moves.':'h_g1','Look at where the wheel touches the cable.':'h_g2','Read the mission card again.':'h_g3','How far does one turn go?':'h_g4','Check all three: turn, wheel, load.':'h_g6','You tested the bot, watched what it did, and changed one thing at a time, until it reached the top. Test it, watch what it does, change one thing.':'end_recap'};
+  'Watch which way the top of the wheel moves.':'h_g1','Look at where the wheel touches the cable.':'h_g2','Read the mission card again.':'h_g3','How far does one turn go?':'h_g4','Check all three: turn, wheel, load.':'h_g6','The steeper the rope, the more grip the wheel needs, so a slipping bot needs a grippier wheel or a lighter load.':'g5_grip',
+  'The steeper the rope, the faster the wheel should spin, so a slipping bot needs a stronger motor.':'g5_motor','The steeper the rope, the bigger the wheel should be, because a big wheel covers more rope each turn.':'g5_big','You tested the bot, watched what it did, and changed one thing at a time, until it reached the top. Test it, watch what it does, change one thing.':'end_recap'};
 let voEl=null, lastLine='';
 const PULLEY_LINE='A wheel with a groove: a dip round its edge where the rope sits.';
 // auto-narration: only lines we have a recording for (never browser TTS unprompted), after audio is unlocked by a tap
@@ -191,18 +201,20 @@ function speak(t,id,{auto=false}={}){ t=t.replace(/<[^>]+>/g,'').trim(); const k
   if(!auto&&lockA) voLock(false); if(isMuted()){ if(lockA) voLock(false); return; } unlock();
   const fallback=()=>{ try{ const u=new SpeechSynthesisUtterance(t); u.rate=0.95; u.onend=()=>mood.duck(false); mood.duck(true); speechSynthesis.speak(u); }catch(e){} };
   if(!key){ fallback(); return; }
-  const a=new Audio(`assets/voice/${key}.mp3`); voEl=a; mood.duck(true); const talk=on=>document.querySelectorAll('#caption .spk,#question .spk').forEach(e=>e.classList.toggle('talking',on)); talk(true);
+  const a=new Audio(`assets/voice/${key}.mp3`); voEl=a; mood.duck(true); const talk=on=>document.querySelectorAll('#caption .txt,#question,#tray .tq').forEach(e=>e.classList.toggle('talking',on)); talk(true);
   const rel=()=>{ if(lockA===a) voLock(false); };
   if(auto){ lockA=a; voLock(true,14000); a.onloadedmetadata=()=>{ if(lockA===a&&isFinite(a.duration)) voLock(true,(a.duration+1)*1000); }; }
   a.onended=()=>{ talk(false); rel(); if(voEl===a){ voEl=null; mood.duck(false); } }; a.onpause=()=>{ talk(false); rel(); }; a.onerror=()=>{ rel(); if(voEl===a){ voEl=null; fallback(); } };
   a.play().catch(()=>{ rel(); if(voEl===a){ voEl=null; fallback(); } }); }
 // found: an icon of what worked at this tower + a FOUND stamp, so the finding is something to look at, not only to read
 function caption(text,{next=true,found=null}={}){ lastLine=text; narrate(text); const old=$('#caption'); if(old) old.remove(); const c=html('div','fade'+(found?' found':'')); c.id='caption';
-  c.innerHTML=`<div class="txt">${found?`<span class="fnd"><b>FOUND</b><span class="eq">${img(found[0])}<i></i>${img(found[1])}</span></span>`:''}<button class="spk" aria-label="Read aloud">${img('skai_icon_speaker')}</button><span>${text}</span></div>`+(next?`<button class="btn next" aria-label="Next">NEXT</button>`:'');
-  c.querySelector('.spk').onclick=()=>speak(text.replace(/<[^>]+>/g,'')); UI.appendChild(c); return c; }
-async function say(text,opt={}){ const c=caption(text,opt); const nb=c.querySelector('.next'); nudge(nb,{tip:'Tap to continue',key:'next',delay:1600}); await click(nb); c.remove(); }
+  c.innerHTML=`<div class="txt" role="button" aria-label="Read aloud">${found?`<span class="fnd"><b>FOUND</b><span class="eq">${img(found[0])}<i></i>${img(found[1])}</span></span>`:''}<span>${text}</span></div>`+(next?`<button class="btn next" aria-label="Next">NEXT</button>`:'');
+  c.querySelector('.txt').onclick=()=>speak(text.replace(/<[^>]+>/g,'')); UI.appendChild(c); return c; }
+// declutter: no speaker sticker on each line. The line itself is the (bigger) replay target and pulses while it is read;
+// the sound note's Replay Narration does the same from anywhere.
+async function say(text,opt={}){ const c=caption(text,opt); const nb=c.querySelector('.next'); nudge(nb,{delay:1600}); await click(nb); c.remove(); }
 // voice:false = re-show a step's question after a run without reading it out again
-function question(text,{voice=true}={}){ lastLine=text; if(voice) narrate(text); const old=$('#question'); if(old) old.remove(); const q=html('div','fade'); q.id='question'; q.innerHTML=`<button class="spk" aria-label="Read aloud">${img('skai_icon_speaker')}</button><span>${text}</span>`; q.querySelector('.spk').onclick=()=>speak(text); UI.appendChild(q); return q; }
+function question(text,{voice=true}={}){ lastLine=text; if(voice) narrate(text); const old=$('#question'); if(old) old.remove(); const q=html('div','fade'); q.id='question'; q.setAttribute('role','button'); q.setAttribute('aria-label','Read aloud'); q.innerHTML=`<span>${text}</span>`; q.onclick=()=>speak(text); UI.appendChild(q); return q; }
 const rmq=()=>{ const q=$('#question'); if(q) q.remove(); };
 
 // projected pins
@@ -235,7 +247,7 @@ function partTag(at,{icon=null,name,line='',r=1,voiceId=null}){ const e=html('di
   return pin(e,at,left?-R:R,0); }
 /* "meet the part": at the start of a step, the light lands on the one thing the child will change and names it in plain words.
    Names the part only (never which setting to choose). */
-async function meetPart(at,{r=1,icon,name,line,voiceId}){ spotlight(at,{r}); await wait(350); const tp=partTag(at,{icon,name,line,r});
+async function meetPart(at,{r=1,icon,name,line,voiceId}){ spotlight(at,{r}); await wait(350); const tp=partTag(at,{icon,name,r}); // name on screen, the sentence is spoken (no narration repeated as text)
   lastLine=line; if(voiceId&&ac_ok()&&!isMuted()) speak(`${name}. ${line}`,voiceId); sfx.pop();
   try{ await wait(3300); } finally { unpin(tp); spotOff(); } await wait(300); }
 
@@ -245,7 +257,7 @@ function buildRun(){ runBtn=html('button','btn hide'); runBtn.id='run'; runBtn.s
   hintBtn=html('button','imgbtn hide'); hintBtn.id='hint'; hintBtn.setAttribute('aria-label','Hint'); hintBtn.innerHTML=img('skai_note_hint')+'<span class="cost">+2 min</span>'; UI.appendChild(hintBtn);
   hintBtn.onclick=async()=>{ if(!S.hintText||S.hintOn) return; S.hintOn=true; sfx.tick(); const b=html('div','fade'); b.id='hintBubble'; b.textContent=S.hintText; UI.appendChild(b); speak(S.hintText); log('hint_requested',{at:S.chapter}); addClock(2,2).catch(()=>{}); setTimeout(()=>{ b.remove(); S.hintOn=false; },4200); }; }
 let runNudge=null;
-function runState(on,enabled=true,label='RUN'){ if(!runBtn) buildRun(); runNudge&&runNudge(); runNudge=null; if(on&&enabled) runNudge=nudge(runBtn,{delay:2600,tip:'Press RUN',key:'run',place:'left'}); runBtn.classList.toggle('hide',!on); runBtn.classList.toggle('off',!enabled); runBtn.querySelector('.lbl').textContent=label; hintBtn.classList.toggle('hide',!on||!S.hintText||!S.hintReady); on?armIdleHint():clearTimeout(idleT); }
+function runState(on,enabled=true,label='RUN'){ if(!runBtn) buildRun(); runNudge&&runNudge(); runNudge=null; if(on&&enabled) runNudge=nudge(runBtn,{delay:2600}); runBtn.classList.toggle('hide',!on); runBtn.classList.toggle('off',!enabled); runBtn.querySelector('.lbl').textContent=label; hintBtn.classList.toggle('hide',!on||!S.hintText||!S.hintReady); on?armIdleHint():clearTimeout(idleT); }
 /* hint note appears after the child's first try at a step, or after ~8 s with no tap while setting up (SKAI template §6).
    It only appears: the hint itself is still given on request (+2 min). The idle clock starts after any narration ends. */
 let idleT=0;
@@ -257,7 +269,7 @@ document.addEventListener('pointerdown',()=>{ if(idleT) armIdleHint(); },{passiv
 // tray
 function tray({options, selected, multi=false, onPick, tabs, carry, custom, onRender}){ let t=$('#tray'); if(t) t.remove(); t=html('div','fade'); t.id='tray';
   let cur = multi? new Set(selected||[]) : selected;
-  const render=()=>{ t.innerHTML=(tabs?`<div class="tabs">${tabs.items.map(x=>`<button class="tab ${x.id===tabs.active?'on':''}" data-tab="${x.id}">${img(x.icon)}${x.label}</button>`).join('')}</div>`:'')+
+  const render=()=>{ t.innerHTML=(tabs?`<div class="tabs">${tabs.items.map(x=>`<button class="tab ${x.id===tabs.active?'on':''}" data-tab="${x.id}" aria-label="${x.label}">${img(x.icon)}${x.id===tabs.active||x.id==='turns'?x.label:''}</button>`).join('')}</div>`:'')+
     (carry?`<div id="carry">${carry}</div>`:'')+
     (custom?custom():`<div class="row">${options.map((o,oi)=>`<button style="--i:${oi}" class="opt ${multi?(cur.has(o.id)?'on':''):(cur===o.id?'on':'')}" data-id="${o.id}" aria-label="${o.aria||o.label||o.id}">${multi?'<span class="chk"></span>':''}${img(o.icon,'main')}${o.badge?img(o.badge,'badge'):''}${o.label?`<span>${o.label}</span>`:''}</button>`).join('')}</div>`);
     t.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{ const id=b.dataset.id; if(multi){ cur.has(id)?cur.delete(id):cur.add(id); } else cur=id; sfx.select(); render(); const nb=t.querySelector(`.opt[data-id="${id}"]`); nb&&nb.classList.add('sweep'); botLook(nb); onPick&&onPick(multi?new Set(cur):cur); });
@@ -276,7 +288,8 @@ function botLook(el){ const b=spare.visible?spare:bot; if(!b.visible||!el) retur
 const OUT=[['climbed','Climbed up','ui_outcome_climbed'],['spun','Spun','ui_outcome_spun'],['slid','Slid back','ui_outcome_slid'],['wrongway','Wrong way','ui_outcome_wrongway'],['stopped','Stopped','ui_outcome_stopped']];
 const OUTIC=Object.fromEntries(OUT.map(o=>[o[0],o[2]]));
 function outcomeSheet(actual, ctxInfo){ const s=html('div','fade'); s.id='sheet'; s.innerHTML=`<h3>What did the bot do?</h3><div class="row">${OUT.map(([id,l,ic])=>`<button class="opt o-${id}" data-id="${id}"><span class="mv">${img(ic,'main')}</span><span>${l}</span></button>`).join('')}</div>`;
-  UI.appendChild(s); const sn=nudge(s.querySelector('h3'),{ring:false,tip:'Tap what the bot actually did',key:'sheet',delay:500}); s.classList.add('glow');
+  UI.appendChild(s); const hudWas=!stage.classList.contains('hudoff'); hudOff(true); // the sheet is one focused question: clock + rail step aside until it's answered
+  const sn=()=>{ if(hudWas) hudOff(false); }; s.classList.add('glow'); // the sheet's own question says what to do: glow only, no extra tip
   return P(done=>{ s.querySelectorAll('.opt').forEach(b=>b.onclick=async()=>{ sn(); s.classList.remove('glow'); sfx.select(); botLook(b); s.querySelectorAll('.opt').forEach(x=>x.onclick=null); b.classList.add('on'); const tapped=b.dataset.id, match=tapped===actual;
     log('outcome_tapped',{...ctxInfo,tapped,actual,match}); if(!match){ s.querySelector(`.opt[data-id="${actual}"]`).classList.add('actual'); setTimeout(()=>{ s.remove(); done(tapped); },1500); } else setTimeout(()=>{ s.remove(); done(tapped); },450); }); return ()=>s.remove(); }); }
 
@@ -364,31 +377,31 @@ const MISSION_VO='Your mission: get the bot to the top. Check four towers and th
 async function missionBrief(){ paintTracker(); show(H.tracker,true);
   const m=html('div','panel fade'); m.id='brief';
   // mostly pictures: the route (what to get done), three icons (what you fix), one cost line. The voice reads it all.
-  m.innerHTML=`<div class="eb">YOUR MISSION</div><h2>Get the bot to the top by 7:00</h2>${routeHTML(-1)}
-    <div class="row2">${fixHTML(['dir','wheel','load'])}<div class="cost">${img('ui_badge_4min')}<span>A failed run<br>costs 4 minutes</span></div></div>
-    <div class="ft"><button class="spk" aria-label="Read aloud">${img('skai_icon_speaker')}</button><button class="btn" id="briefGo">${START_LABEL}</button></div>`;
-  m.querySelector('.spk').onclick=()=>speak(MISSION_VO,'s1_mission'); UI.appendChild(m); lastLine=MISSION_VO; if(ac_ok()) setTimeout(()=>speak(MISSION_VO,'s1_mission'),250);
+  m.innerHTML=`<h2>Get the bot to the top by 7:00</h2>${routeHTML(-1,['Top','7:00'])}
+    <div class="row2">${fixHTML(['dir','wheel','load'])}<div class="cost">${img('ui_badge_4min')}<span>for each<br>failed run</span></div></div>
+    <div class="ft"><button class="btn" id="briefGo">${START_LABEL}</button></div>`;
+  UI.appendChild(m); lastLine=MISSION_VO; if(ac_ok()) setTimeout(()=>speak(MISSION_VO,'s1_mission'),250);
   // the pieces arrive in step with the voice; the rail and the clock glow when their part is said (attention only)
   setTimeout(()=>H.tracker.classList.add('attn'),2200);
   setTimeout(()=>{ H.tracker.classList.remove('attn'); m.classList.add('s2'); },4600);
-  setTimeout(()=>{ m.classList.add('s3'); H.clock.classList.add('attn'); },8200);
+  setTimeout(()=>{ m.classList.add('s3'); H.clock.classList.add('attn'); showDue(0); },8200);
   setTimeout(()=>H.clock.classList.remove('attn'),11000);
   const go=m.querySelector('#briefGo'); nudge(go,{delay:11500});
-  try{ await click(go); } finally { H.tracker.classList.remove('attn'); H.clock.classList.remove('attn'); m.remove(); }
+  try{ await click(go); } finally { H.tracker.classList.remove('attn'); H.clock.classList.remove('attn'); H.clock.classList.remove('duev'); m.remove(); }
   log('mission_brief_read'); }
 // fade the intro video out; the world is drawn again underneath while it fades, then the video stops decoding
 function introOff(){ const iv=$('#intro'); world.hidden=false; dirty(); if(!iv||!iv.classList.contains('on')) return; iv.classList.remove('on'); setTimeout(()=>{ if(!iv.classList.contains('on')) iv.pause(); },900); }
-async function S2(){ S.chapter='S2'; world.kidsBob=false;
+async function S2(){ S.chapter='S2'; world.kidsBob=false; hudOff(true);
   await camTo({x:0.2,y:2.2,zoom:150},1.4); world.dockOpen=1; dirty(); sfx.pop(); await wait(300);
   placeBotSpan(bot,0,1.25); bot.drop=0.9; bot.alpha=0; await tween(bot,{drop:0,alpha:1},0.5,ease.out); kick(bot,0.5); sfx.clack(); world.dockOpen=0; dust(bot); bot.expr='happy'; world.kids.forEach(k=>{ if(k.n<=4) k.anim='wave'; }); setTimeout(()=>{ world.kids.forEach(k=>k.anim='idle'); bot.expr='idle'; },3200);
   await camPath([{x:botWheelCenter(bot).x+0.9,y:botWheelCenter(bot).y-0.75,zoom:250,rot:0.03,d:1.6,ease:'power3.inOut'},{x:botWheelCenter(bot).x+0.8,y:botWheelCenter(bot).y-0.75,zoom:262,rot:0,d:2.5,ease:'sine.inOut',at:'-=0.1'}]);
   const wAt=()=>{ const w=botWheelCenter(bot); return [w.x,w.y]; }; spotlight(wAt,{r:0.5});
-  const p=partTag(wAt,{icon:'ui_profile_smooth',name:'Its wheel',line:'Smooth all the way round',r:0.5});
+  const p=partTag(wAt,{icon:'ui_profile_smooth',name:'Its wheel',r:0.5}); // the caption says it is smooth
   try{ await say('This is the inspection bot. It came with a smooth wheel.'); } finally { unpin(p); spotOff(); }
 }
 async function S3(){ S.chapter='S3';
   await camTo({x:17,y:9.6,zoom:30},1.6); world.pathDots=true; question('Will it reach the top tower?');
-  const g=html('div','guesses'); g.innerHTML=[['yes','Yes','ui_guess_yes'],['partway','Partway','ui_guess_partway'],['no','No','ui_guess_no']].map(([id,l,ic])=>`<button class="guess" data-id="${id}">${img(ic)}<span>${l}</span></button>`).join(''); UI.appendChild(g); nudge(g,{ring:false,arrow:false,tip:'Tap your guess',key:'guess',delay:1400}); g.classList.add('bob');
+  const g=html('div','guesses'); g.innerHTML=[['yes','Yes','ui_guess_yes'],['partway','Partway','ui_guess_partway'],['no','No','ui_guess_no']].map(([id,l,ic])=>`<button class="guess" data-id="${id}">${img(ic)}<span>${l}</span></button>`).join(''); UI.appendChild(g); g.classList.add('bob'); // the cards bob; the question says what to do (no extra "tap" tip)
   const pick=await P(done=>{ g.querySelectorAll('.guess').forEach(b=>b.onclick=()=>{ sfx.select(); done(b); }); });
   S.guess=pick.dataset.id; log('story_guess',{choice:S.guess}); rmq();
   const label={yes:'Yes',partway:'Partway',no:'No'}[S.guess]; const r=pick.getBoundingClientRect(), sr=stage.getBoundingClientRect();
@@ -430,8 +443,8 @@ async function S4(){ S.chapter='S4';
     if(choice==='rope'||attempt>=2){ answered=true; pr.classList.add('ok'); [pw,pb].forEach(x=>x.style.opacity='.4'); sfx.chime(); }
     else { ch.classList.add('dashed'); await demo(0.5); ch.classList.remove('dashed'); }
   }
-  rmq(); const cmp=compareCard(); try{ await say('The rope stays still, so the wheel moves itself along it.'); } finally { cmp.remove(); }
-  [P1,P2,P3,q1,q2].forEach(unpin);
+  rmq(); [P1,P2,P3].forEach(unpin); const cmp=compareCard(); try{ await say('The rope stays still, so the wheel moves itself along it.'); } finally { cmp.remove(); }
+  [q1,q2].forEach(unpin);
   bot.d=d0(0); dirty();
 }
 /* S4 side by side: the one picture of the core idea. Two small loops, same wheel:
@@ -442,14 +455,14 @@ function compareCard(){ const spokes=r=>[0,60,120].map(a=>`<line x1="${-r}" y1="
   c.innerHTML=`<div class="cx"><div class="ct">AT THE STATION</div>
       <svg viewBox="0 0 320 170" aria-hidden="true"><path class="rope flow" d="M320 30 L112 30 A52 52 0 0 0 112 134 L320 134"/>
         <rect class="stand" x="104" y="84" width="16" height="78" rx="4"/><g transform="translate(112 82)"><circle class="rim" r="52"/><g class="spin">${spokes(44)}</g><circle class="hub" r="9"/></g></svg>
-      <div class="cl"><span class="st">${img('ui_clamp')}Stays: <b>wheel</b></span><span class="mv"><i></i>Moves: <b>rope</b></span></div></div>
+      <div class="cl"><span class="st">${img('ui_clamp')}Stays: <b>wheel</b></span></div></div>
     <div class="cvs"></div>
     <div class="cx"><div class="ct">ON THE BOT</div>
       <svg viewBox="0 0 320 170" aria-hidden="true"><line class="rope" x1="14" y1="150" x2="306" y2="46"/>
         <image href="${A('ui_clamp')}" x="-4" y="126" width="40" height="40"/><image href="${A('ui_clamp')}" x="288" y="22" width="40" height="40"/>
         <g class="ride"><g transform="translate(-6 -17)"><line class="hang" x1="0" y1="0" x2="0" y2="40"/><rect class="body" x="-17" y="34" width="34" height="28" rx="8"/><circle class="eye" cx="-7" cy="47" r="3.5"/><circle class="eye" cx="7" cy="47" r="3.5"/>
           <circle class="rim" r="17"/><g class="spin">${spokes(13)}</g><circle class="hub" r="4"/></g></g></svg>
-      <div class="cl"><span class="st">${img('ui_clamp')}Stays: <b>rope</b></span><span class="mv"><i></i>Moves: <b>wheel</b></span></div></div>`;
+      <div class="cl"><span class="st">${img('ui_clamp')}Stays: <b>rope</b></span></div></div>`;
   UI.appendChild(c); sfx.whoosh(); log('compare_shown'); return c; }
 /* S4 "look closer": one continuous push from the hill into the wheel-on-rope contact.
    (The 1 m → 10 cm → 1 cm scale ruler was removed: scale is not what this beat teaches, the still rope under a turning wheel is.)
@@ -493,23 +506,23 @@ async function G1(){ S.chapter='G1'; S.dir=null; S.hintReady=false; S.hintText='
 let diaryEl=null;
 const WICON=w=>'ui_wheel_'+w, DIRIC=d=>d==='ccw'?'ui_turn_ccw':'ui_turn_cw';
 function diaryOpen(tw,fields,top=118){ diaryClose(); diaryEl=html('div','panel diary hide'); diaryEl.id='diary'; diaryEl.style.top=top+'px'; diaryEl._tw=tw; diaryEl._f=fields; UI.appendChild(diaryEl); paintDiary(); }
-function diaryClose(){ if(diaryEl){ diaryEl.remove(); diaryEl=null; } }
+function diaryClose(fadeOut=false){ if(!diaryEl) return; const d=diaryEl; diaryEl=null; if(fadeOut){ d.classList.add('hide'); setTimeout(()=>d.remove(),400); } else d.remove(); }
 function diaryAdd(tw,setup,actual){ S.diary.push({tw,dir:setup.dir,wheel:setup.wheel,items:[...setup.items],actual}); log('diary_row',{tw,actual}); paintDiary(true); }
 function paintDiary(isNew=false){ if(!diaryEl) return; const all=S.diary.filter(r=>r.tw===diaryEl._tw), rows=all.slice(-4), off=all.length-rows.length;
   diaryEl.classList.toggle('hide',!rows.length);
   const cell=(f,r,p)=>{ const chg=p&&(f==='items'?[...p.items].sort().join()!==[...r.items].sort().join():p[f]!==r[f]);
     const inner=f==='dir'?img(DIRIC(r.dir)):f==='wheel'?img(WICON(r.wheel)):`<span class="ld">${r.items.length?r.items.map(i=>img('ui_item_'+i)).join(''):'<em>0</em>'}</span>`;
     return `<span class="c c-${f} ${chg?'chg':''}">${inner}</span>`; };
-  diaryEl.innerHTML=`<div class="dh">${img('ui_notebook')}<b>YOUR RUNS</b></div>`+rows.map((r,i)=>`<div class="dr ${r.actual==='climbed'?'ok':''} ${isNew&&i===rows.length-1?'new':''}"><span class="n">${off+i+1}</span>${diaryEl._f.map(f=>cell(f,r,rows[i-1]||all[off-1])).join('')}<i class="ar"></i>${img(OUTIC[r.actual],'oc')}</div>`).join('');
+  diaryEl.innerHTML=`<div class="dh"><b>YOUR RUNS</b></div>`+rows.map((r,i)=>`<div class="dr ${r.actual==='climbed'?'ok':''} ${isNew&&i===rows.length-1?'new':''}">${diaryEl._f.map(f=>cell(f,r,rows[i-1]||all[off-1])).join('')}<i class="ar"></i>${img(OUTIC[r.actual],'oc')}</div>`).join('');
   if(isNew) sfx.pop(); }
 /* ask: the step's question, on screen while the child sets up (read aloud the first time only, gone during the run).
    found: what this tower showed, said once after it is cleared, in the child's terms. It reports what happened, never the
    general rule: the rule is the child's to pick in Say the Rule. */
 // [line, [what you set, what happened]]: the sticker reads as a tiny picture equation
-const FOUND={1:['Tower 1 checked. The way the wheel turns sets which way the bot goes.',['ui_turn_cw','ui_outcome_climbed']],
-  2:['Tower 2 checked. On the steep cable, the grooved wheel with a band did not slip.',['ui_wheel_band','ui_outcome_climbed']],
-  3:['Tower 3 checked. With only the camera, the bot was light enough to climb.',['ui_item_camera','ui_outcome_climbed']],
-  4:['Tower 4 checked. Each turn moves the bot the distance around its wheel. The bigger wheel goes farther.',['ui_one_turn','ui_hdr_distance']]};
+const FOUND={1:['The way the wheel turns sets which way the bot goes.',['ui_turn_cw','ui_outcome_climbed']],
+  2:['On the steep cable, the grooved wheel with a band did not slip.',['ui_wheel_band','ui_outcome_climbed']],
+  3:['With only the camera, the bot was light enough to climb.',['ui_item_camera','ui_outcome_climbed']],
+  4:['Each turn moves the bot the distance around its wheel. The bigger wheel goes farther.',['ui_one_turn','ui_hdr_distance']]};
 function setupView(b=bot){ const w=botWheelCenter(b), z=Math.min(190,segView(b.span).zoom*1.45); return {x:w.x+0.35, y:w.y-0.25, zoom:z}; }
 async function towerLoop(tw,getSetup,reopen,{onSuccess,ask,found,fields=['dir','wheel'],diaryTop=118}={}){
   let run=0, prev=null; diaryOpen(tw,fields,diaryTop);
@@ -525,7 +538,7 @@ async function towerLoop(tw,getSetup,reopen,{onSuccess,ask,found,fields=['dir','
     else { if(o.type==='climbed'&&!o.jobDone){ /* camera missing */ const [x,y]=botScreen(); floatAt('ui_glyph_film',x,y-70,90); } await addClock(4,4); }
     lensHide(); await wait(400);
     await outcomeSheet(actual,{tower:tw,run}); diaryAdd(tw,s,actual); S.hintReady=true;
-    if(success){ await addClock(4); if(found) await say(found[0],{found:found[1]}); diaryClose(); return {run}; }
+    if(success){ await addClock(4); diaryClose(true); if(found) await say(found[0],{found:found[1]}); return {run}; }
     // neutral replay
     await replay(tw,s); prev=s;
   }
@@ -569,10 +582,10 @@ async function G4(){ S.chapter='G4'; S.hintReady=false; S.hintText='How far does
   /* bar model (replaces the old turns table): one coloured block per turn, the same colour as the strip it laid on the cable.
      "1 turn = ? cm" until the first strip is measured, then the number lands in it. */
   const bars=html('div','panel fade'); bars.id='bars'; UI.appendChild(bars); const groups=[];
-  const paintBars=()=>{ bars.innerHTML=`<div class="bh">${img('ui_one_turn')}<b>ONCE AROUND THE WHEEL</b></div>`+groups.map(g=>`<div class="bgp">
+  const paintBars=()=>{ bars.innerHTML=`<div class="bh"><b>ONCE AROUND THE WHEEL</b></div>`+groups.map(g=>`<div class="bgp">
       <div class="eq">${img(g.icon)}<span>1 turn =</span><em class="${g.known?'':'q'}">${g.known?g.cm:'?'}</em><span>cm</span></div>
       <div class="blocks">${Array.from({length:g.n},(_,k)=>`<i style="width:${g.cm*5.2}px;background:${RIBBON_COLS[k%2]}">${g.cm}</i>`).join('')}</div>
-      ${g.n?`<div class="tot">${g.n} turn${g.n>1?'s':''} = <b>${g.n*g.cm} cm</b></div>`:''}</div>`).join(''); };
+      ${g.n>1?`<div class="tot">${g.n} turns = <b>${g.n*g.cm} cm</b></div>`:''}</div>`).join(''); }; // the total appears from 2 turns (1 turn = the equation above)
   // tape stamp: "N cm" pops on the strip this turn laid, then flies into its new block
   const stampToBlock=cm=>{ const C=2*Math.PI*R(bot), s=SPANS[3], mp=spanPoint(3,bot.d-C/2); const [x,y]=scr(mp.x-s.nx*0.55,mp.y-s.ny*0.55);
     const st=html('div','stamp',`${img('ui_tape')}<span>${cm} cm</span>`); st.style.left=x+'px'; st.style.top=y+'px'; UI.appendChild(st);
@@ -583,22 +596,23 @@ async function G4(){ S.chapter='G4'; S.hintReady=false; S.hintText='How far does
   // one turn: the coloured rim peels off onto the cable (world.ribbon.peel shrinks as the strip grows)
   const turnBy=(C,secs,k,onStep)=>{ const r=R(bot), from=bot.d; world.ribbon.seg=C; world.ribbon.peel={b:bot,k:0,c:k};
     return P(done=>{ motion={b:bot,phases:[{up(m,dt){ const st=Math.min(C/secs*dt, from+C-bot.d); bot.d+=st; bot.angle+=st/r; world.ribbon.len=bot.d-G4D; world.ribbon.peel.k=(bot.d-from)/C; onStep&&onStep(); return bot.d>=from+C-1e-6; }}],i:0,t:0,speed:1,done}; return ()=>{ motion=null; }; }); };
-  async function watchTurns(n,cm,icon){ const g={cm,n:0,known:false,icon}; groups.push(g); paintBars();
+  async function watchTurns(n,cm,icon){ hudOff(true); /* watching costs no time: clock + rail step aside until the prediction */ const g={cm,n:0,known:false,icon}; groups.push(g); paintBars();
     const r=R(bot), C=2*Math.PI*r; world.ribbon={span:3,d0:G4D,len:0,seg:C,peel:{b:bot,k:0,c:0}}; dirty(); // the rim shows its colour before the first turn
     // close in on the wheel so the strip is big enough to see; the camera rides along behind it
     follow={bot, lead:-0.35, zoom:235, shift:-10}; await wait(900);
     question('Turn the wheel. How far does the bot go?').classList.add('aside'); const t=html('div','fade'); t.id='tray'; t.innerHTML=`<div class="row"><button class="opt wide" id="oneTurn">${img('ui_one_turn','main')}<span>1 turn</span></button></div>`; UI.appendChild(t);
-    for(let k=1;k<=n;k++){ nudge($('#oneTurn'),{tip:'Tap to turn the wheel once',key:'oneturn',delay:500}); await click($('#oneTurn')); $('#oneTurn').disabled=true;
+    // glow only: the question says "Turn the wheel" and the button says "1 turn"
+    for(let k=1;k<=n;k++){ nudge($('#oneTurn'),{delay:500}); await click($('#oneTurn')); $('#oneTurn').disabled=true;
       await turnBy(C,1.5,k-1,()=>sfx.motor(true,0.6)); sfx.motor(false); world.ribbon.peel=null; dirty();
       g.n=k; paintBars(); sfx.pop(); await stampToBlock(cm); if(!g.known){ g.known=true; paintBars(); bars.querySelector('.bgp:last-child .eq em').classList.add('land'); } sfx.chime();
       if(k<n){ world.ribbon.peel={b:bot,k:0,c:k}; dirty(); } $('#oneTurn').disabled=false; }
     t.remove(); rmq(); follow=null; await camTo(view,1.3); } // pull back: every strip on the tape at once
-  async function predictRun(target,cm,ctxName){ bot.d=G4D; world.ribbon.len=0; world.ribbon.peel=null; dirty();
+  async function predictRun(target,cm,ctxName){ hudOff(false); bot.d=G4D; world.ribbon.len=0; world.ribbon.peel=null; dirty();
     world.flags=[{span:3,d:G4D+target/10}]; sfx.pop(); { const fp=spanPoint(3,G4D+target/10); spotlight(()=>[fp.x,fp.y+0.6],{r:1.1}); setTimeout(spotOff,1900); }
     // the question sits in the stepper box (question + answer together), so the flag up the tape and the bot stay in view; the flag carries no number
     const qt=`The flag is ${target} cm up. How many turns?`; lastLine=qt; narrate(qt);
-    let val=3; const t=html('div','fade'); t.id='tray'; t.classList.add('ask'); t.innerHTML=`<div class="tq"><button class="spk" aria-label="Read aloud">${img('skai_icon_speaker')}</button><span>${qt}</span></div><div class="stepper"><button class="imgbtn" id="minus" aria-label="Fewer">${img('ui_btn_minus')}</button><div class="val" id="sv">${val}</div><button class="imgbtn" id="plus" aria-label="More">${img('ui_btn_plus')}</button></div>`; UI.appendChild(t);
-    t.querySelector('.tq .spk').onclick=()=>speak(qt); $('#minus').onclick=()=>{ val=Math.max(1,val-1); $('#sv').textContent=val; sfx.tick(); }; $('#plus').onclick=()=>{ val=Math.min(99,val+1); $('#sv').textContent=val; sfx.tick(); };
+    let val=3; const t=html('div','fade'); t.id='tray'; t.classList.add('ask'); t.innerHTML=`<div class="tq" role="button" aria-label="Read aloud"><span>${qt}</span></div><div class="stepper"><button class="imgbtn" id="minus" aria-label="Fewer">${img('ui_btn_minus')}</button><div class="val" id="sv">${val}</div><button class="imgbtn" id="plus" aria-label="More">${img('ui_btn_plus')}</button></div>`; UI.appendChild(t);
+    t.querySelector('.tq').onclick=()=>speak(qt); $('#minus').onclick=()=>{ val=Math.max(1,val-1); $('#sv').textContent=val; sfx.tick(); }; $('#plus').onclick=()=>{ val=Math.min(99,val+1); $('#sv').textContent=val; sfx.tick(); };
     S.hintReady=true; nudge(t.querySelector('.stepper'),{delay:900}); runState(true,true); await click(runBtn); runState(false); t.remove();
     const needed=Math.round(target/cm); const r=R(bot), C=2*Math.PI*r; const cnt=html('div','counter'); cnt.style.backgroundImage=`url(${A('ui_counter_bubble')})`; const cp=pin(cnt,()=>{ const w=botWheelCenter(bot); return [w.x,w.y]; });
     const maxD=SPANS[3].len-0.4; let k=0;
@@ -622,16 +636,16 @@ async function G4(){ S.chapter='G4'; S.hintReady=false; S.hintText='How far does
   await performRun(bot,4,{dir:'cw',wheel:bot.wheel,items:new Set(['camera'])}); lensHide(); await towerArrive(3); await addClock(4);
   await say(FOUND[4][0],{found:FOUND[4][1]});
 }
-async function G5(){ S.chapter='G5'; S.hintText='';
+async function G5(){ S.chapter='G5'; S.hintText=''; hudOff(true);
   cine(true); await camPath([{x:30,y:16,zoom:24,rot:-0.03,d:1.6,ease:'power2.inOut'},{x:16,y:10.5,zoom:30,rot:0,d:1.8,ease:'power3.out'}]); cine(false); $('#dim').classList.add('on');
   const R0=[{id:'grip',t:'The steeper the rope, the <b>more grip</b> the wheel needs, so a slipping bot needs a grippier wheel or a lighter load.',ok:true},
     {id:'motor',t:'The steeper the rope, the <b>faster</b> the wheel should spin, so a slipping bot needs a stronger motor.'},
     {id:'big',t:'The steeper the rope, the <b>bigger</b> the wheel should be, because a big wheel covers more rope each turn.'}].sort(()=>Math.random()-0.5);
   await titleCard('THE BIG IDEA','SAY THE RULE'); question('Which sentence is true?');
-  const box=html('div',''); box.id='rules'; box.innerHTML=R0.map(r=>`<button class="rule fade" data-id="${r.id}"><span class="rs" aria-label="Read aloud">${img('skai_icon_speaker')}</span><span class="rt">${r.t}</span></button>`).join('')+`<div style="text-align:center;margin-top:10px"><button class="btn teal" id="lockIn" disabled>${img('ui_btn_lock')}Lock in</button></div>`; UI.appendChild(box);
+  const box=html('div',''); box.id='rules'; box.innerHTML=`<div class="stem fade">The steeper the rope…</div>`+R0.map(r=>`<button class="rule fade" data-id="${r.id}"><span class="rt">…${r.t.replace(/^The steeper the rope, /,'')}</span></button>`).join('')+`<div style="text-align:center;margin-top:10px"><button class="btn teal" id="lockIn" disabled>Lock in</button></div>`; UI.appendChild(box);
   /* no extra tip here: the question already says what to do */
-  let sel=null; box.querySelectorAll('.rule').forEach(b=>b.onclick=e=>{ if(e.target.closest('.rs')){ speak(b.textContent,'g5_'+b.dataset.id); return; } // speaker icon reads the sentence, doesn't pick it
-    clearNudges(); nudge($('#lockIn'),{delay:600,tip:'Then lock it in',key:'lock'}); sel=b.dataset.id; sfx.select(); box.querySelectorAll('.rule').forEach(x=>x.classList.toggle('on',x===b)); $('#lockIn').disabled=false; });
+  let sel=null; box.querySelectorAll('.rule').forEach(b=>b.onclick=()=>{ speak(b.textContent,'g5_'+b.dataset.id); // picking a sentence also reads it aloud (the child can still change their pick before Lock in)
+    clearNudges(); nudge($('#lockIn'),{delay:600}); sel=b.dataset.id; sfx.select(); box.querySelectorAll('.rule').forEach(x=>x.classList.toggle('on',x===b)); $('#lockIn').disabled=false; });
   await click($('#lockIn')); $('#lockIn').disabled=true; box.querySelectorAll('.rule').forEach(b=>b.onclick=null);
   const ok=sel==='grip'; log('rule_chosen',{sentence_id:sel,correct:ok}); rmq();
   if(!ok){ const wheel=sel==='big'?'big_smooth':'smooth'; const line=sel==='big'?'At Tower 2, the big smooth wheel slipped too.':'At Tower 2, the wheel was already spinning fast. It still slipped.';
@@ -643,6 +657,7 @@ async function G5(){ S.chapter='G5'; S.hintText='';
 }
 /* G5 blueprint: the three towers redrawn as field notes (slope, grip needed, what worked), then the rule word by word.
    Plays after lock-in whatever was chosen. One panel slides (transform); tiles/meters/words are small CSS animations. */
+const GRIP_LINE='The steeper the rope, the more grip the wheel needs, so a slipping bot needs a grippier wheel or a lighter load.';
 async function blueprint(){
   const T=[{n:'Tower 1',d:'gentle',h:40,need:1,tw:1,fb:{wheel:'smooth',items:[]}},{n:'Tower 2',d:'steep',h:108,need:2,tw:2,fb:{wheel:'band',items:[]}},{n:'Tower 3',d:'steep + load',h:108,need:3,tw:3,bag:true,fb:{wheel:'band',items:['camera']}}];
   // each tile lists that tower's runs from the diary (what was on the bot → what it did); a jump from the menu falls back to the working set-up
@@ -653,10 +668,10 @@ async function blueprint(){
       <svg viewBox="0 0 320 200" aria-hidden="true"><line class="gnd" x1="6" y1="188" x2="314" y2="188"/><line class="slope" x1="20" y1="182" x2="304" y2="${182-t.h}"/>
         <g class="whl" style="--h:${t.h}"><circle r="15"/><line x1="-15" x2="15"/><line y1="-15" y2="15"/>${t.bag?'<rect x="-11" y="20" width="22" height="18" rx="5"/>':''}</g></svg>
       <div class="bp-n"><b>${t.n}</b> · ${t.d}</div>
-      <div class="bp-meter">${[0,1,2].map(k=>`<i class="${k<t.need?'f':''}" style="--k:${k}"></i>`).join('')}<span>grip needed</span></div>
+      <div class="bp-meter">${[0,1,2].map(k=>`<i class="${k<t.need?'f':''}" style="--k:${k}"></i>`).join('')}${i===0?'<span>grip needed</span>':''}</div>
       <div class="bp-runs">${runsOf(t).map((r,k)=>`<div class="bp-r ${r.actual==='climbed'?'ok':''}" style="--k:${k}">${img(WICON(r.wheel))}${t.bag?img(bag(r.items.length)):''}<i class="ar"></i>${img(OUTIC[r.actual])}</div>`).join('')}</div></div>`).join('')}</div>
-    <div class="bp-rule"><button class="spk" aria-label="Read aloud">${img('skai_icon_speaker')}</button><p>${'The steeper the rope, the more grip the wheel needs.'.split(' ').map((w,i)=>`<span style="--w:${i}">${w}</span>`).join(' ')}</p></div>`;
-  bp.querySelector('.spk').onclick=()=>speak('The steeper the rope, the more grip the wheel needs, so a slipping bot needs a grippier wheel or a lighter load.','g5_grip');
+    <div class="bp-rule"><p>${'The steeper the rope, the more grip the wheel needs.'.split(' ').map((w,i)=>`<span style="--w:${i}">${w}</span>`).join(' ')}</p></div>`;
+  lastLine=GRIP_LINE; // Replay Narration (sound note) reads the rule
   UI.appendChild(bp); sfx.whoosh(); log('blueprint_shown',{from_diary:S.diary.length});
   const go=(from,to,ms)=>P(done=>{ const a=bp.animate([{transform:from},{transform:to}],{duration:ms,easing:'cubic-bezier(.7,0,.2,1)',fill:'forwards'}); a.onfinish=done; return ()=>a.cancel(); });
   try{ await go('translateX(-102%)','none',650); setTimeout(()=>sfx.tick(),1300); setTimeout(()=>sfx.tick(),1800); setTimeout(()=>sfx.tick(),2300); setTimeout(()=>sfx.chime(),4300);
@@ -702,7 +717,7 @@ async function G6(){ S.chapter='G6'; S.hintReady=false; S.hintText='Check all th
 }
 async function replayRope(st){ spare.d=0; const tag=html('div','chip fade',`${img('ui_replay')}Replay`); tag.style.left='32px'; tag.style.bottom='322px'; UI.appendChild(tag);
   await performRun(spare,'rope',{dir:st.dir,wheel:st.wheel,items:new Set(st.items)},{speed:0.75,replay:true}); await wait(400); tag.remove(); lensHide(); spare.d=0; dirty(); }
-async function G7(){ S.chapter='G7'; S.hintText=''; runState(false); show(H.banner,false);
+async function G7(){ S.chapter='G7'; S.hintText=''; runState(false); show(H.banner,false); hudOff(true); stage.classList.add('endmode');
   const onTime=S.clock<=420; S.star=onTime;
   cine(true); await cloudWipe(()=>{ Object.assign(cam,V.rideStart,{rot:0}); }); shake(0.3); world.kidsVisible=true;
   await tween(world,{gateOpen:1},0.6,ease.out); sfx.clack();
@@ -720,14 +735,12 @@ async function G7(){ S.chapter='G7'; S.hintText=''; runState(false); show(H.bann
   try{ await tween(g,{d:total},9,ease.io); } finally { rideFollow=null; }
   const shot=snapPostcard(); sfx.shutter(); flash(0.85); await wait(500);
   await camPath([{x:18,y:12,zoom:28,rot:0,d:2.2,ease:'power3.inOut'}]); cine(false);
-  /* what you did → what you found out → the big idea (SKAI template: the end reinforces the learning, not only "well done") */
-  const nRuns=S.log.filter(e=>e.ev==='run_started'||e.ev==='prediction').length;
+  /* what you did (voice: END_LINE) → what you found out → the big idea (SKAI template: the end reinforces the learning, not only "well done") */
   const card=html('div','panel fade'); card.id='endcard'; card.style.position='absolute';
-  card.innerHTML=`<div class="tk"><div class="postcard"><div class="pc-photo"></div><div class="pc-cap">Hilltop Ropeway · Left at ${fmt(S.clock)}</div></div>${onTime?img('ui_star_burst','burst'):''}</div>
+  card.innerHTML=`<div class="tk"><div class="postcard"><div class="pc-photo"></div><div class="pc-cap">Left at ${fmt(S.clock)}</div></div>${onTime?img('ui_star_burst','burst'):''}</div>
     <div><h2>${onTime?'On time. Your class is riding up.':'Your class is riding up.'}</h2>
-    <div class="did">${img('ui_replay')}<span>${nRuns>1?`You tested the bot ${nRuns} times and changed its turn, wheel and load.`:'You tested the bot and changed its turn, wheel and load.'}</span></div>
     <div class="learnt"><b>What you found out</b>${LEARNT.map(([ic,t],i)=>`<div class="ln" style="--i:${i}">${img(ic)}<span>${t}</span></div>`).join('')}</div>
-    <div class="big" style="--i:${LEARNT.length}"><b>THE BIG IDEA</b><span>${BIG_IDEA}</span><button class="spk" aria-label="Read aloud">${img('skai_icon_speaker')}</button></div>
+    <div class="big" style="--i:${LEARNT.length}"><b>THE BIG IDEA</b><span>${BIG_IDEA}</span></div>
     <div class="ft"><button class="btn ghost" id="again">Play again</button><div class="kit"><video class="teaser" muted playsinline preload="auto" poster="assets/video/tarzan_teaser.webp" src="assets/video/tarzan_teaser.mp4" aria-label="Tarzan Bot kit"></video><span>Next class: Tarzan Bot on a real rope.</span></div></div></div>`;
   UI.appendChild(card); card.querySelector('.pc-photo').appendChild(shot.canvas);
   { const tv=card.querySelector('.teaser'), toImg=()=>{ const i=new Image(); i.src=A('ui_kit_bridge'); i.alt=''; tv.replaceWith(i); }; // teaser plays once, holds its last frame
@@ -735,7 +748,7 @@ async function G7(){ S.chapter='G7'; S.hintText=''; runState(false); show(H.bann
   { const pc=card.querySelector('.postcard'), R0=stageRect(pc); // FLIP: the photo flies from where the gondola was into the card
     pc.animate([{transform:`translate(${shot.x-(R0.x+R0.w/2)}px,${shot.y-(R0.y+R0.h/2)}px) scale(.3) rotate(0deg)`,opacity:.2},{transform:'rotate(-4deg)',opacity:1}],{duration:900,easing:'cubic-bezier(.2,.9,.25,1.1)'}); }
   LEARNT.forEach((_,i)=>setTimeout(()=>sfx.pop(),1100+i*380)); // each learning sticks onto the page with a soft pop
-  card.querySelector('.big .spk').onclick=()=>speak(END_LINE,'end_recap'); lastLine=END_LINE;
+  lastLine=END_LINE;
   setTimeout(()=>{ if(card.isConnected) narrate(END_LINE); },1100+LEARNT.length*380+300); // the recap is read once the page is filled in
   if(onTime) sfx.fanfare(); const gpp=gondolaPos(); addFX('vfx_confetti',gpp[0],gpp[1]+1.5,8,{fps:10}); addFX('vfx_arrival_sparkle',gpp[0],gpp[1]+1,5); log('mission_end',{towers:world.lit.filter(Boolean).length+(world.topLit?1:0),points:S.points,on_time:onTime,depart_time:fmt(S.clock)});
   nudge($('#again'),{delay:3400}); await click($('#again')); play(0);
@@ -764,6 +777,7 @@ function preset(idx){ const id=CH[idx][0]; const lit=n=>world.lit=[0,1,2,3].map(
   if(['G3','G4','G5','G6','G7'].includes(id)) bot.wheel='band';
   if(id==='G5'||id==='G7') placeBotSpan(bot,3,SPANS[3].len-0.32);
   if(id==='G7'){ world.topLit=true; spare.visible=true; spare.mode='rope'; spare.d=12-0.25; spare.wheel='band'; spare.items=new Set(['camera']); bot.dim=true; world.ropeRuler=false; }
+  hudOff(idx>=1&&idx<=3); stage.classList.remove('endmode'); ptsSeen=S.points; clearTimeout(ptsT); ptsT=0;
   introOff(); closeNotes(); world.cover=false; world.bg=null; stage.classList.remove('cover'); stage.classList.remove('tray-left'); world.lit.forEach((l,i)=>trackLit[i]=l); trackTop=world.topLit; world.pulse=null; S.sunrise=S.clock>=380; postcard=null;
   if(idx>0){ mood.ambience(true); mood.bed(world.topLit?5:Math.min(4,1+world.lit.filter(Boolean).length)); } else { mood.bed(0); mood.ambience(false); }
   paintClock(); paintTracker(); show(H.clock,idx>0); show(H.tracker,idx>=1); /* the rail is the mission's progress: on from the mission brief (end of S1) */ show(H.banner,false); show(H.mission,false);

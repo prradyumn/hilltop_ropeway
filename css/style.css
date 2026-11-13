@@ -677,3 +677,35 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 #endcard .big span{font:900 24px/1.2 var(--font);color:var(--navy);grid-column:1;text-wrap:balance}
 #endcard .big .spk{grid-column:2;grid-row:1 / span 2}
 @media (prefers-reduced-motion: reduce){ #endcard .did,#endcard .big{animation:none} }
+
+/* ---------- 13: declutter pass ---------- */
+/* contextual HUD: clock + rail only while they can change; the end screen keeps just exit + sound */
+#clock,#tracker{transition:opacity .35s,transform .4s cubic-bezier(.2,.9,.25,1.2)}
+#stage.hudoff #clock,#stage.hudoff #tracker{opacity:0;transform:translateY(-14px);pointer-events:none}
+#stage.hudoff #tracker{transform:translateX(30px)}
+#stage.endmode #infoBtn,#stage.endmode #infoNote{opacity:0;pointer-events:none;transition:opacity .3s}
+/* "First ride 7:00" only when time is added */
+#clock .due{opacity:0;transition:opacity .3s,transform .3s;transform:translate(-50%,-6px)}
+#clock.duev .due{opacity:1;transform:translate(-50%,0)}
+#clock .tv{top:16px}
+/* the line is the replay button (no speaker sticker): a soft ring pulses while it is read */
+#caption .txt,#question,#tray .tq{cursor:pointer}
+#caption .txt{padding-left:32px}
+#question{padding-left:34px}
+#caption .txt.talking,#question.talking{animation:lineTalk 1.4s ease-in-out infinite}
+#tray .tq.talking span{animation:lineTalkTxt 1.4s ease-in-out infinite}
+@keyframes lineTalk{0%,100%{box-shadow:0 0 0 3px #fff,0 0 0 6px rgba(0,174,239,.28),var(--shadow)}50%{box-shadow:0 0 0 3px #fff,0 0 0 9px rgba(0,174,239,.5),var(--shadow)}}
+@keyframes lineTalkTxt{0%,100%{opacity:1}50%{opacity:.78}}
+#rules .rule{padding-left:26px}
+/* diary: plain icons (no tile behind each), the changed setting keeps its yellow ring */
+#diary .c{background:none;min-width:40px;padding:0}
+#diary .c.chg{background:#fff;box-shadow:0 0 0 3px #FFC83D}
+#diary .dh{margin-left:4px}
+/* tabs: icon only unless open (or the Turns tab, which carries the guess) */
+.tab:not(.on):not([data-tab="turns"]){padding:6px}
+#compare .cl{justify-content:center}
+@media (prefers-reduced-motion: reduce){ #caption .txt.talking,#question.talking,#tray .tq.talking span{animation:none} }
+/* G5: the shared start of all three sentences, said once */
+#rules .stem{font:400 34px/1.1 var(--fredoka);color:#fff;text-shadow:0 2px 0 rgba(10,30,70,.35);padding:0 0 0 10px;margin-bottom:-4px}
+#rules .stem.fade{--tx:0}
+#mission .lines{top:68px} /* no eyebrow: the clipboard art already reads as the job card; lines sit centred below the clip */
