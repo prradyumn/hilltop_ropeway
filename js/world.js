@@ -329,7 +329,10 @@ export function drawBot(b){ if(!b.visible||b.alpha<=0) return; const z=Z(); cons
     { const [gx,gy]=toScreen(bc.x+jx,bc.y+jy), hr=z*0.5, ha=Math.max(0.12,Math.min(1,(150-z)/80)); // soft halo: the bot reads at every zoom
       const hg=ctx.createRadialGradient(gx,gy,hr*0.25,gx,gy,hr); hg.addColorStop(0,`rgba(255,248,220,${(0.42*ha).toFixed(3)})`); hg.addColorStop(1,'rgba(255,248,220,0)'); ctx.fillStyle=hg; circ(gx,gy,hr); ctx.fill();
       const cp=b.mode==='rope'?[ROPE.x,wc.y]:(()=>{ const q=spanPoint(b.span,b.d); return [q.x,q.y]; })(); const [cx2,cy2]=toScreen(cp[0],cp[1]), cr=Math.max(4,z*0.14), ca=(b.v||0)>0?0.55:0.28; // wheel–cable contact glow
-      const cg=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,cr); cg.addColorStop(0,`rgba(255,226,150,${ca})`); cg.addColorStop(1,'rgba(255,226,150,0)'); ctx.fillStyle=cg; circ(cx2,cy2,cr); ctx.fill(); ctx.globalAlpha=b.alpha; }
+      const cg=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,cr); cg.addColorStop(0,`rgba(255,226,150,${ca})`); cg.addColorStop(1,'rgba(255,226,150,0)'); ctx.fillStyle=cg; circ(cx2,cy2,cr); ctx.fill(); ctx.globalAlpha=b.alpha; 
+      if(b.polish>0.02){ const u=b.mode==='rope'?[0,1]:[SPANS[b.span].ux,SPANS[b.span].uy], L=0.32; const [p1x,p1y]=toScreen(cp[0]-u[0]*L,cp[1]-u[1]*L), [p2x,p2y]=toScreen(cp[0]+u[0]*L,cp[1]+u[1]*L); // slip: a shiny rub mark where the wheel turns without holding
+        ctx.lineCap='round'; ctx.strokeStyle=`rgba(255,255,255,${(0.35*b.polish).toFixed(3)})`; ctx.lineWidth=Math.max(5,z*0.09); ctx.beginPath(); ctx.moveTo(p1x,p1y); ctx.lineTo(p2x,p2y); ctx.stroke();
+        ctx.strokeStyle=`rgba(255,255,255,${(0.9*b.polish).toFixed(3)})`; ctx.lineWidth=Math.max(2,z*0.03); ctx.beginPath(); ctx.moveTo(p1x,p1y); ctx.lineTo(p2x,p2y); ctx.stroke(); } }
     if(world.painted&&has('bot_face')&&pk('bot_eyes_idle')){ sprA('bot_face','center',bc.x+jx,bc.y+jy,1,rot,b.alpha); const en=eyesFor(b), im=pk(en)||pk('bot_eyes_idle'); const ew=0.4, eh=ew*im.height/im.width; const ox=-Math.sin(rot)*0.02+(b.lookX||0)*0.05, oy=Math.cos(rot)*0.02+(b.lookY||0)*0.035; // lookX/Y in -1..1: eyes glance toward what was tapped
       pimg(en,bc.x+jx+ox,bc.y+jy+oy,eh,0.5,0.5,{rot,alpha:b.alpha}); }
     else sprA(b.dim||b.blink>0?'bot_blink':'bot_body','center',bc.x+jx,bc.y+jy,1,rot,b.alpha);

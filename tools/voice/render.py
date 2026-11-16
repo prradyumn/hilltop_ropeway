@@ -26,7 +26,7 @@ LINES = {
     "s4_pulley": "Pulley. A wheel with a groove: a dip round its edge, where the rope sits.",
     "g4_q": "How many turns to the flag?",
     "g5_q": "Which sentence is true?",
-    "g5_grip": "The steeper the rope, the more grip the wheel needs, so a slipping bot needs a grippier wheel or a lighter load.",
+    "g5_grip": "The steeper the rope, the more grip the wheel needs, so a slipping bot needs a grippier wheel.",
     "g5_motor": "The steeper the rope, the faster the wheel should spin, so a slipping bot needs a stronger motor.",
     "g5_big": "The steeper the rope, the bigger the wheel should be, because a big wheel covers more rope each turn.",
     "g5_bigslip": "At Tower 2, the big smooth wheel slipped too.",
@@ -52,10 +52,17 @@ LINES = {
     "f_t4": "Each turn moves the bot the distance around its wheel. The bigger wheel goes farther.",
     # spotlight pass: the part each step changes, named in plain words
     "p_turn": "Turn. You choose which way the wheel spins.",
-    "p_wheel": "Wheel. You can swap it for a different wheel.",
-    "p_load": "Load. Everything the bot carries.",
+    "p_wheel": "Wheel. Its edge is the part that holds the cable.",
+    "p_load": "Load. Everything the bot carries. Each thing adds weight.",
     "p_tape": "Tape. It shows how far the bot goes.",
     # SKAI template pass: the end card recap (what you did -> the big idea)
+    # learning-gap pass: what each wheel's edge is like (said when picked), and the motor's limit (after the bot stops once)
+    "w_smooth": "Smooth metal, like a spoon.",
+    "w_big_smooth": "Smooth metal, just bigger.",
+    "w_grooved": "A dip that the cable sits in.",
+    "w_band": "A dip with a rubber band, like a shoe sole.",
+    "w_big_band": "A dip with a rubber band, just bigger.",
+    "g3_limit": "The motor can only pull this much up a slope this steep.",
     "end_recap": "You tested the bot, watched what it did, and changed one thing at a time, until it reached the top. Test it, watch what it does, change one thing.",
 }
 

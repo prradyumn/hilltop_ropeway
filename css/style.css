@@ -709,3 +709,27 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 #rules .stem{font:400 34px/1.1 var(--fredoka);color:#fff;text-shadow:0 2px 0 rgba(10,30,70,.35);padding:0 0 0 10px;margin-bottom:-4px}
 #rules .stem.fade{--tx:0}
 #mission .lines{top:68px} /* no eyebrow: the clipboard art already reads as the job card; lines sit centred below the clip */
+
+/* ===== 14: learning-gap pass (wheel feel, load weight) ===== */
+/* close-up: what the selected wheel's edge is like, under the picture */
+#lens .feel{position:absolute;left:14px;right:14px;bottom:12px;text-align:center;background:rgba(255,255,255,.94);color:var(--navy);font:800 23px/1.15 var(--font);padding:9px 12px;border-radius:14px;display:none;text-wrap:balance}
+#lens.hasfeel .feel{display:block}
+#lens.on.slipzoom{transform:scale(1.32)} /* replay of a slip: the close-up grows while the wheel slips */
+#ui > .chip{transition:transform .28s cubic-bezier(.2,.9,.25,1.15)} #lens.slipzoom ~ #ui > .chip{transform:translateY(-96px)} /* the Replay / You guessed chips make room */
+/* job card: four lines (every item has a reason) */
+#mission{height:262px}
+/* G3 load column: blocks of weight beside the bot; the motor line appears after the first stop */
+#loadcol{width:0;height:0}
+#loadcol .lc{position:absolute;left:0;bottom:0;width:78px;display:flex;flex-direction:column;align-items:center;transition:opacity .3s}
+#loadcol.off .lc{opacity:0}
+#loadcol .lc-stack{display:flex;flex-direction:column-reverse;width:70px}
+#loadcol .lc-stack i{box-sizing:border-box;height:calc(var(--u)*30px);border-top:3px solid #fff;border-radius:9px;display:grid;place-items:center;
+  background:repeating-linear-gradient(to top,var(--c) 0 27px,rgba(255,255,255,.5) 27px 30px);box-shadow:inset 0 -3px 0 rgba(0,0,0,.14),0 2px 6px rgba(20,30,60,.18)}
+#loadcol .lc-stack i img{width:23px;height:23px;object-fit:contain;filter:drop-shadow(0 1px 0 rgba(255,255,255,.7))}
+#loadcol .lc-stack i.land{animation:pop .45s}
+#loadcol .lc-base{width:78px;height:44px;border-radius:12px;background:#FFF8E7;box-shadow:0 0 0 3px #fff,0 3px 8px rgba(20,30,60,.2);display:grid;place-items:center}
+#loadcol .lc-base img{width:34px;height:34px;object-fit:contain}
+#loadcol .lc-lim{z-index:2;position:absolute;left:-26px;width:130px;bottom:calc(44px + 30px);border-top:4px dashed var(--skaiOrange,#F26B21);opacity:0;transform:scaleX(.3);transition:opacity .3s,transform .45s cubic-bezier(.2,.9,.25,1.2)}
+#loadcol .lc-lim span{position:absolute;right:calc(100% + 6px);bottom:-15px;white-space:nowrap;background:#fff;color:var(--navy);font:800 16px/1 var(--font);padding:6px 10px;border-radius:999px;box-shadow:0 2px 6px rgba(20,30,60,.18)}
+#loadcol.lim .lc-lim{opacity:1;transform:none}
+@media (prefers-reduced-motion: reduce){ #loadcol .lc-stack i.land{animation:none} #loadcol .lc-lim{transition:none} }

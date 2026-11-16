@@ -83,20 +83,23 @@ function updFollow(dt){ if(!follow) return; const b=follow.bot, w=botWheelCenter
   const tx=w.x+lx, ty=w.y+ly - (follow.shift||100)/cam.zoom; const k=1-Math.exp(-6*dt); cam.x+= (tx-cam.x)*k; cam.y+=(ty-cam.y)*k; if(follow.zoom) cam.zoom=Math.exp(lerp(Math.log(cam.zoom),Math.log(follow.zoom),k*0.5)); }
 
 /* ================= sky & light keyed to the clock ================= */
-const SKYK=[[375,'#2E3266','#E9A08C',0.30],[380,'#5F7FC0','#FFC79A',0.12],[390,'#86B7E3','#FFE6C2',0.03],[405,'#84BFEA','#E9F5FF',0],[420,'#7DBAEB','#DDF0FF',0]];
+// dawn lives in the sky colours + a golden key light; the playfield wash stays light (it used to be 30% navy at 6:15, which made Tower 1 / the story look flat)
+const SKYK=[[375,'#4A5AA6','#F6B394',0.07],[380,'#6688C8','#FFC99C',0.03],[390,'#86B7E3','#FFE6C2',0],[405,'#84BFEA','#E9F5FF',0],[420,'#7DBAEB','#DDF0FF',0]];
 const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)); const mix=(a,b,t)=>{ const A1=hex(a),B1=hex(b); return `rgb(${A1.map((v,i)=>Math.round(lerp(v,B1[i],t))).join(',')})`; };
 let tintA=0.3, warmA=0;
 function applySky(){ const m=clamp(S.clock,375,420); let i=0; while(i<SKYK.length-2&&m>SKYK[i+1][0]) i++; const a=SKYK[i], b=SKYK[i+1]; const t=clamp((m-a[0])/(b[0]-a[0]),0,1);
   stage.style.setProperty('--skyTop',mix(a[1],b[1],t)); stage.style.setProperty('--skyBot',mix(a[2],b[2],t)); tintA=lerp(a[3],b[3],t);
   const d=clamp((m-375)/45,0,1); stage.style.setProperty('--stars',String(clamp(1-d*5,0,1))); stage.style.setProperty('--sunX',(12+d*16)+'%'); stage.style.setProperty('--sunY',(86-Math.sin(clamp((m-372)/48,0,1)*Math.PI/2)*68)+'%');
-  stage.style.setProperty('--cloudA',String(0.35+d*0.4)); world.warm=clamp(1-(m-375)/14,0,1); warmA=m<378?0:m<392?(m-378)/14*0.14:m<406?0.14:Math.max(0.06,0.14-(m-406)/14*0.08); dirty(); }
+  stage.style.setProperty('--cloudA',String(0.35+d*0.4)); world.warm=clamp(1-(m-375)/14,0,1); warmA=m<378?0.10:m<392?0.10+(m-378)/14*0.04:m<406?0.14:Math.max(0.06,0.14-(m-406)/14*0.08); dirty(); }
 
 /* ================= lens ================= */
 const lensEl=$('#lens'); let lens=null; try{ lens=createLens($('#lensCanvas')); }catch(e){ lens=null; } if(!lens) lensEl.classList.add('nogl');
 let lensBot=null;
-function lensShow(mode,name,fallbackImg){ lensEl.querySelector('.name').textContent=name||''; lensEl.querySelector('.fallback').src=A(fallbackImg||'ui_profile_smooth'); lensEl.classList.add('on'); lensEl.classList.toggle('compact',mode==='idle'); stage.classList.add('lens-on'); if(lens){ lens.size(438,274,Math.min(1.5,rscale)); lens.show(mode); } }
-function lensHide(){ lensEl.classList.remove('on'); stage.classList.remove('lens-on'); setTimeout(()=>{ if(!lensEl.classList.contains('on')&&lens) lens.hide(); },300); lensBot=null; }
+function lensShow(mode,name,fallbackImg,feel=''){ lensEl.querySelector('.name').textContent=name||''; lensEl.querySelector('.feel').textContent=feel; lensEl.classList.toggle('hasfeel',!!feel); lensEl.querySelector('.fallback').src=A(fallbackImg||'ui_profile_smooth'); lensEl.classList.add('on'); lensEl.classList.toggle('compact',mode==='idle'); stage.classList.add('lens-on'); if(lens){ lens.size(438,274,Math.min(1.5,rscale)); lens.show(mode); } }
+function lensHide(){ lensEl.classList.remove('on','slipzoom'); stage.classList.remove('lens-on'); setTimeout(()=>{ if(!lensEl.classList.contains('on')&&lens) lens.hide(); },300); lensBot=null; }
 const WNAME={smooth:'Smooth wheel',big_smooth:'Big smooth wheel',grooved:'Grooved wheel',band:'Grooved + band',big_band:'Big grooved + band'};
+// what each wheel's edge is like, in a child's terms: what it is made of, never what it will do on the slope (spoken on pick, shown in the close-up)
+const WFEEL={smooth:'Smooth metal, like a spoon.',big_smooth:'Smooth metal, just bigger.',grooved:'A dip that the cable sits in.',band:'A dip with a rubber band, like a shoe sole.',big_band:'A dip with a rubber band, just bigger.'};
 const WPROF={smooth:'ui_profile_smooth',big_smooth:'ui_profile_big_smooth',grooved:'ui_profile_grooved',band:'ui_profile_band',big_band:'ui_profile_big_band'};
 
 /* ================= HUD ================= */
@@ -180,7 +183,7 @@ const VO={'6:15 am. Your class is first in line.':'s1_queue','No ride until the 
   'The way the wheel turns sets which way the bot goes.':'f_t1','On the steep cable, the grooved wheel with a band did not slip.':'f_t2',
   'With only the camera, the bot was light enough to climb.':'f_t3','Each turn moves the bot the distance around its wheel. The bigger wheel goes farther.':'f_t4','Which sentence is true?':'g5_q','Grip is what stops the slipping.':'g5_end',
   'At Tower 2, the big smooth wheel slipped too.':'g5_bigslip','At Tower 2, the wheel was already spinning fast. It still slipped.':'g5_fastslip',
-  'Watch which way the top of the wheel moves.':'h_g1','Look at where the wheel touches the cable.':'h_g2','Read the mission card again.':'h_g3','How far does one turn go?':'h_g4','Check all three: turn, wheel, load.':'h_g6','The steeper the rope, the more grip the wheel needs, so a slipping bot needs a grippier wheel or a lighter load.':'g5_grip',
+  'Watch which way the top of the wheel moves.':'h_g1','Look at where the wheel touches the cable.':'h_g2','Read the mission card again.':'h_g3','How far does one turn go?':'h_g4','Check all three: turn, wheel, load.':'h_g6','The steeper the rope, the more grip the wheel needs, so a slipping bot needs a grippier wheel.':'g5_grip',
   'The steeper the rope, the faster the wheel should spin, so a slipping bot needs a stronger motor.':'g5_motor','The steeper the rope, the bigger the wheel should be, because a big wheel covers more rope each turn.':'g5_big','You tested the bot, watched what it did, and changed one thing at a time, until it reached the top. Test it, watch what it does, change one thing.':'end_recap'};
 let voEl=null, lastLine='';
 const PULLEY_LINE='A wheel with a groove: a dip round its edge where the rope sits.';
@@ -302,8 +305,8 @@ function updMotion(dt){ if(!motion) return; const m=motion, d=dt*m.speed*TS.v; c
 const PH={
   climb:(to,v=2)=>({ start(m){ m.b.expr='focused'; }, end(m){ m.b.v=0; }, up(m,dt){ const b=m.b; b.v=v; const st=Math.min(v*dt,to-b.d); b.d+=st; b.angle+=st/R(b); sfx.motor(true,v/2); m.dustT=(m.dustT??0.15)-dt; if(m.dustT<=0&&v>=1){ m.dustT=0.3; cableDust(b); } return b.d>=to-1e-6; } }),
   drive:(to,v=2)=>({ end(m){ m.b.v=0; }, up(m,dt){ const b=m.b; b.v=0; const st=Math.min(v*dt,b.d-to); b.d-=st; b.angle-=st/R(b); sfx.motor(true,v/2); return b.d<=to+1e-6; } }),
-  spin:(dur,slide=0)=>({ start(m){ sfx.squeal(true); drama('slip'); m.b.expr='surprised'; m.fxT=0; }, up(m,dt){ const b=m.b; m.fxT-=dt; if(m.fxT<=0){ m.fxT=0.45; sparks(b); } b.angle+=2/R(b)*dt; b.jit=0.035; sfx.motor(true,1); if(slide&&m.t>0.3) b.d=Math.max(0.05,b.d-slide*dt/(dur-0.3)); return m.t>=dur; }, end(m){ m.b.jit=0; sfx.squeal(false); } }),
-  slide:(to)=>({ start(m){ m.v=0; sfx.squeal(true); kick(m.b,0.25); drama('slip'); m.b.expr='surprised'; sparks(m.b); }, up(m,dt){ const b=m.b; m.v+=3*dt; const st=Math.min(m.v*dt,b.d-to); b.d-=st; b.angle-=0.6*st/R(b); b.jit=0.02; sfx.motor(true,0.4); return b.d<=to+1e-6; }, end(m){ m.b.jit=0; sfx.squeal(false); sfx.bump(); kick(m.b,-0.3); drama('bump'); dust(m.b); } }),
+  spin:(dur,slide=0)=>({ slip:true, start(m){ sfx.squeal(true); drama('slip'); m.b.expr='surprised'; m.fxT=0; }, up(m,dt){ const b=m.b; m.fxT-=dt; if(m.fxT<=0){ m.fxT=0.45; sparks(b); } b.angle+=2/R(b)*dt; b.jit=0.035; b.polish=Math.min(1,(b.polish||0)+dt*3); sfx.motor(true,1); if(slide&&m.t>0.3) b.d=Math.max(0.05,b.d-slide*dt/(dur-0.3)); return m.t>=dur; }, end(m){ m.b.jit=0; sfx.squeal(false); } }),
+  slide:(to)=>({ slip:true, start(m){ m.v=0; sfx.squeal(true); kick(m.b,0.25); drama('slip'); m.b.expr='surprised'; sparks(m.b); }, up(m,dt){ const b=m.b; m.v+=3*dt; const st=Math.min(m.v*dt,b.d-to); b.d-=st; b.angle-=0.6*st/R(b); b.jit=0.02; b.polish=Math.min(1,(b.polish||0)+dt*3); sfx.motor(true,0.4); return b.d<=to+1e-6; }, end(m){ m.b.jit=0; sfx.squeal(false); sfx.bump(); kick(m.b,-0.3); drama('bump'); dust(m.b); } }),
   decay:(dur=1.2)=>({ start(m){ drama('stall'); m.b.expr='surprised'; }, up(m,dt){ const b=m.b; const v=2*Math.exp(-2.5*m.t); const st=v*dt; b.d=Math.min(pathLen(b)-0.4,b.d+st); b.angle+=st/R(b); sfx.motor(true,v/2); return m.t>=dur; }, end(m){ sfx.motor(false); kick(m.b,0.35); } }),
   hold:(dur)=>({ up(m){ sfx.motor(false); return m.t>=dur; } }),
   call:(fn)=>({ up(m){ fn(m); return true; } }),
@@ -313,13 +316,15 @@ function kick(b,a){ b.swayV+=a*3; }
 function sparks(b){ if(!b.visible) return; const W=WHEELS[b.wheel]; addFX('vfx_slip_sparks',0,0,0.9,{follow:()=>{ const w=botWheelCenter(b); if(b.mode==='rope') return [w.x+W.r,w.y]; const s=SPANS[b.span]; return [w.x-s.nx*W.r,w.y-s.ny*W.r]; }}); }
 function cableDust(b){ if(!b.visible) return; const p=b.mode==='rope'?{x:ROPE.x,y:botWheelCenter(b).y}:spanPoint(b.span,b.d); addFX('vfx_dust_puff',p.x,p.y-0.05,0.32); } // little puffs where the wheel grips
 function dust(b){ if(!b.visible) return; const c=botBodyCenter(b); addFX('vfx_dust_puff',c.x,c.y-0.35,0.9); }
-function updBots(dt){ world.bots.forEach(b=>{ if(!b.visible) return; if(!(motion&&motion.b===b)){ b.idleT=(b.idleT??3)-dt; if(b.idleT<0){ b.swayV+=0.13*(Math.random()<0.5?-1:1); b.idleT=3+Math.random()*3; } } const k=18, c=2.2; const acc=-k*b.sway - c*b.swayV; b.swayV+=acc*dt; b.sway+=b.swayV*dt; if(Math.abs(b.sway)>0.0005||Math.abs(b.swayV)>0.0005) dirty();
+function updBots(dt){ world.bots.forEach(b=>{ if(!b.visible) return; if(b.polish>0){ b.polish=Math.max(0,b.polish-dt*0.5); dirty(); } // rub mark on the cable fades if(!(motion&&motion.b===b)){ b.idleT=(b.idleT??3)-dt; if(b.idleT<0){ b.swayV+=0.13*(Math.random()<0.5?-1:1); b.idleT=3+Math.random()*3; } } const k=18, c=2.2; const acc=-k*b.sway - c*b.swayV; b.swayV+=acc*dt; b.sway+=b.swayV*dt; if(Math.abs(b.sway)>0.0005||Math.abs(b.swayV)>0.0005) dirty();
   b.blinkT-=dt; if(b.blinkT<0){ b.blink=0.14; b.blinkT=2.5+Math.random()*3.5; } if(b.blink>0){ b.blink-=dt; dirty(); } }); }
 
+// load: each item adds weight blocks; the motor can pull PULL blocks up a steep cable. Heavier = stops sooner.
+const WT={camera:1,lamp:2,battery:2,toolbox:3}, PULL=1; const loadOf=items=>[...items].reduce((a,i)=>a+(WT[i]||0),0);
 const D0S=[1.25,1.5,1.5,1.5]; const D0=0.4; const d0=i=>D0S[i]; // start distance on a span
 function outcome(tw,s){ if(s.dir!=='cw') return {type:'wrong'}; const grip={smooth:0,big_smooth:0,grooved:1,band:2,big_band:2}[s.wheel]; const need=tw===1?0:2;
   if(grip<need) return grip===1?{type:'slid',at:.55}:{type:'spun',big:s.wheel==='big_smooth'};
-  const extra=[...s.items].filter(i=>i!=='camera').length; if(extra>0) return {type:'stalled',at:[.70,.55,.45][extra-1]};
+  const over=loadOf(s.items)-PULL; if(over>0) return {type:'stalled',at:Math.max(0.4,0.76-0.05*over)};
   return {type:'climbed', jobDone: (tw===1||tw===2)?true:s.items.has('camera')}; }
 const ACTUAL={climbed:'climbed',wrong:'wrongway',spun:'spun',slid:'slid',stalled:'stopped'};
 function phasesFor(b,o){ const L=pathLen(b), end=L-(b.mode==='rope'?0.25:0.32);
@@ -335,8 +340,11 @@ function phasesFor(b,o){ const L=pathLen(b), end=L-(b.mode==='rope'?0.25:0.32);
 async function performRun(b, tw, setup, {speed=1, replay=false}={}){
   const o=outcome(tw,setup); clearNudges(); trayHide(); runState(false); show(H.banner,false); // clearNudges: tray tips must not float over the run / outcome sheet
   camTw&&camTw.kill(); vignette(true); follow={bot:b, lead:1.2, zoom:cam.zoom, shift:b.mode==='rope'?60:110, replay}; gsap.to(follow,{zoom:b.mode==='rope'?120:150,duration:1.1,ease:'power2.inOut'}); lensBot=b; lensShow('contact',WNAME[b.wheel],WPROF[b.wheel]);
-  await runPhases(b,phasesFor(b,o),speed); gsap.killTweensOf(follow); follow=null; vignette(false); setTimeout(()=>{ b.expr='idle'; dirty(); },1400); return {o, actual:ACTUAL[o.type]};
+  let phs=phasesFor(b,o); if(replay&&(o.type==='spun'||o.type==='slid')) phs=slowSlip(phs,speed);
+  await runPhases(b,phs,speed); lensEl.classList.remove('slipzoom'); gsap.killTweensOf(follow); follow=null; vignette(false); setTimeout(()=>{ b.expr='idle'; dirty(); },1400); return {o, actual:ACTUAL[o.type]};
 }
+// neutral replay of a slip: the slipping moment plays slower and the close-up grows, so the wheel turning without the bot moving is easy to see (no words)
+function slowSlip(phs,speed){ return phs.map(p=>!p.slip?p:{...p, start(m){ m.speed=speed*0.55; lensEl.classList.add('slipzoom'); p.start&&p.start(m); }, end(m){ p.end&&p.end(m); m.speed=speed; lensEl.classList.remove('slipzoom'); }}); }
 async function resetBot(b,d=(b.mode==='span'?d0(b.span):0)){ if(Math.abs(b.d-d)<0.01) return; await tween(b,{d},0.6,ease.io); }
 
 /* ================= world helpers ================= */
@@ -487,8 +495,8 @@ async function lookCloser(b){ const back={x:cam.x,y:cam.y,zoom:cam.zoom,rot:cam.
 const atWheel=(b=bot)=>()=>{ const w=botWheelCenter(b); return [w.x,w.y]; }, atBody=(b=bot)=>()=>{ const w=botWheelCenter(b), c=botBodyCenter(b); return [(w.x+c.x)/2,(w.y+c.y)/2]; };
 /* the part each step changes, in plain words (names the part, never the setting to pick) */
 const PART={dir:{icon:'ui_tab_direction',name:'Turn',line:'You choose which way the wheel spins.',voiceId:'p_turn'},
-  wheel:{icon:'ui_tab_wheel',name:'Wheel',line:'You can swap it for a different wheel.',voiceId:'p_wheel'},
-  load:{icon:'ui_tab_load',name:'Load',line:'Everything the bot carries.',voiceId:'p_load'},
+  wheel:{icon:'ui_tab_wheel',name:'Wheel',line:'Its edge is the part that holds the cable.',voiceId:'p_wheel'},
+  load:{icon:'ui_tab_load',name:'Load',line:'Everything the bot carries. Each thing adds weight.',voiceId:'p_load'},
   tape:{icon:'ui_tape',name:'Tape',line:'It shows how far the bot goes.',voiceId:'p_tape'}};
 async function G1(){ S.chapter='G1'; S.dir=null; S.hintReady=false; S.hintText='Watch which way the top of the wheel moves.'; S.changedBeforeFirst=false;
   world.operator.visible=false; // brief: operator appears in story slides only (preset() covers menu jumps, this covers play-through)
@@ -555,24 +563,35 @@ async function G2(){ S.chapter='G2'; S.hintReady=false; S.hintText='Look at wher
   let firstRunDone=false;
   const opts=[{id:'smooth',icon:'ui_wheel_smooth',label:'Smooth'},{id:'big_smooth',icon:'ui_wheel_big_smooth',label:'Big smooth'},{id:'grooved',icon:'ui_wheel_grooved',label:'Grooved'},{id:'band',icon:'ui_wheel_band',label:'Grooved + band'}]; // no corner profile badges: the close-up shows the selected wheel's profile
   const tr=tray({ options:opts, selected:bot.wheel, carry:`${img('ui_turn_cw')}Turn kept`, onPick:async v=>{ if(!firstRunDone) S.changedBeforeFirst=true; log('setting_changed',{tower:2,variable:'wheel',from:bot.wheel,to:v,anticipated:!firstRunDone});
-    await swapWheel(bot,v); lensShow('idle',WNAME[v],WPROF[v]); } });
-  lensShow('idle',WNAME[bot.wheel],WPROF[bot.wheel]); lensBot=bot; // no tray tip: the question above says what to do
-  await towerLoop(2,()=>{ firstRunDone=true; return {dir:S.dir||'cw',wheel:bot.wheel,items:new Set()}; },()=>{ tr.show(); runState(true,true); lensBot=bot; lensShow('idle',WNAME[bot.wheel],WPROF[bot.wheel]); },{ ask:'Steeper cable. Which wheel will get the bot up?', found:FOUND[2], fields:['wheel'] });
+    speak(WFEEL[v],'w_'+v); await swapWheel(bot,v); lensShow('idle',WNAME[v],WPROF[v],WFEEL[v]); } });
+  lensShow('idle',WNAME[bot.wheel],WPROF[bot.wheel],WFEEL[bot.wheel]); lensBot=bot; // no tray tip: the question above says what to do
+  await towerLoop(2,()=>{ firstRunDone=true; return {dir:S.dir||'cw',wheel:bot.wheel,items:new Set()}; },()=>{ tr.show(); runState(true,true); lensBot=bot; lensShow('idle',WNAME[bot.wheel],WPROF[bot.wheel],WFEEL[bot.wheel]); },{ ask:'Steeper cable. Which wheel will get the bot up?', found:FOUND[2], fields:['wheel'] });
   tr.remove(); lensHide();
 }
 async function swapWheel(b,v){ sfx.pop(); await tween(b,{wheelPop:0.01},0.16,ease.in); b.wheel=v; await tween(b,{wheelPop:1},0.3,ease.out); kick(b,0.2); sfx.clack(); }
 const ITEMS=[{id:'camera',icon:'ui_item_camera',label:'Camera'},{id:'lamp',icon:'ui_item_lamp',label:'Lamp'},{id:'toolbox',icon:'ui_item_toolbox',label:'Toolbox'},{id:'battery',icon:'ui_item_battery',label:'Spare battery'}];
-function missionCard(done=false){ H.mission.querySelector('.lines').innerHTML=`<div class="ln ${done?'done':''}" id="jobLine">${img('ui_glyph_film')}<span>Film the cable.</span><i class="tick"></i></div><div class="ln">${img('ui_glyph_sunrise')}<span>Sunrise: 6:20</span></div><div class="ln">${img('ui_glyph_battery')}<span>Battery: full</span></div>`; }
+function missionCard(done=false){ H.mission.querySelector('.lines').innerHTML=`<div class="ln ${done?'done':''}" id="jobLine">${img('ui_glyph_film')}<span>Film the cable.</span><i class="tick"></i></div><div class="ln">${img('ui_glyph_sunrise')}<span>Sunrise: 6:20</span></div><div class="ln">${img('ui_glyph_battery')}<span>Battery: full</span></div><div class="ln">${img('ui_item_toolbox')}<span>Fixing: none today</span></div>`; }
 async function G3(){ S.chapter='G3'; S.hintReady=false; S.hintText='Read the mission card again.'; S.changedBeforeFirst=false;
   placeBotSpan(bot,2); bot.items=new Set(['camera','lamp','toolbox','battery']); await crane(segView(2,135),2.4); await banner('TOWER 3','STEEPER, WITH LOAD',{route:2,fix:['load']});
   await meetPart(atBody(),{r:0.95,...PART.load});
   // today's job card arrives with the scene dimmed behind it, so it is the one thing to look at
   missionCard(false); show(H.mission,true); sfx.pop(); H.mission.classList.add('attn'); $('#dim').classList.add('on'); setTimeout(()=>{ H.mission.classList.remove('attn'); $('#dim').classList.remove('on'); },2600);
-  let firstRunDone=false;
-  const tr=tray({ options:ITEMS, selected:[...bot.items], multi:true, onPick:v=>{ if(!firstRunDone) S.changedBeforeFirst=true; bot.items=v; kick(bot,0.25); dirty(); log('setting_changed',{tower:3,variable:'load',items:[...v],anticipated:!firstRunDone}); } });
-  await towerLoop(3,()=>{ firstRunDone=true; return {dir:S.dir||'cw',wheel:bot.wheel,items:new Set(bot.items)}; },()=>{ tr.show(); runState(true,true); },{ ask:'What should the bot carry today?', found:FOUND[3], fields:['items'], diaryTop:352, onSuccess:async()=>{ sfx.shutter(); missionCard(true); } });
-  tr.remove(); await wait(600); show(H.mission,false);
+  let firstRunDone=false; const col=loadColumn(bot); col.paint(bot.items); const stops0=S.diary.filter(r=>r.tw===3&&r.actual==='stopped').length;
+  const tr=tray({ options:ITEMS, selected:[...bot.items], multi:true, onPick:v=>{ if(!firstRunDone) S.changedBeforeFirst=true; const added=[...v].find(i=>!bot.items.has(i)); bot.items=v; col.paint(v,added); kick(bot,0.25); dirty(); log('setting_changed',{tower:3,variable:'load',items:[...v],anticipated:!firstRunDone}); } });
+  await towerLoop(3,()=>{ firstRunDone=true; col.show(false); return {dir:S.dir||'cw',wheel:bot.wheel,items:new Set(bot.items)}; },()=>{ tr.show(); runState(true,true); col.show(true);
+      // after the bot has stopped once, the column shows how much the motor could pull (what happened, not which item to drop)
+      if(S.diary.filter(r=>r.tw===3&&r.actual==='stopped').length>stops0&&col.limit()){ sfx.pop(); speak(LIMIT_LINE,'g3_limit'); log('limit_shown',{tower:3}); } },
+    { ask:'What should the bot carry today?', found:FOUND[3], fields:['items'], diaryTop:392, onSuccess:async()=>{ sfx.shutter(); missionCard(true); } });
+  tr.remove(); col.remove(); await wait(600); show(H.mission,false);
 }
+/* G3 load column: one block per unit of weight, stacked beside the bot (same bar-model look as Tower 4). The dashed line
+   (what the motor can pull up this slope) only appears after the bot has stopped once. Pinned: follows the bot, transform-only. */
+const LIMIT_LINE='The motor can only pull this much up a slope this steep.';
+const ITEM_COL={camera:'#2BA8C4',lamp:'#F2B632',battery:'#4DB35E',toolbox:'#E8613C'};
+function loadColumn(b){ const e=html('div',''); e.id='loadcol'; e.innerHTML=`<div class="lc"><div class="lc-lim"><span>Most it can pull</span></div><div class="lc-stack"></div><div class="lc-base">${img('ui_tab_load')}</div></div>`;
+  const p=pin(e,atBody(b),-290,0); // left of the tower head the bot starts beside, clear of the cable
+  return { paint:(items,pop)=>{ e.querySelector('.lc-stack').innerHTML=ITEMS.filter(i=>items.has(i.id)).map(i=>`<i class="${i.id===pop?'land':''}" style="--u:${WT[i.id]};--c:${ITEM_COL[i.id]}">${img(i.icon)}</i>`).join(''); },
+    show:on=>e.classList.toggle('off',!on), limit:()=>{ if(e.classList.contains('lim')) return false; e.classList.add('lim'); return true; }, remove:()=>unpin(p) }; }
 const G4D=1.6;
 async function G4(){ S.chapter='G4'; S.hintReady=false; S.hintText='How far does one turn go?';
   placeBotSpan(bot,3,G4D); bot.items=new Set(['camera']); if(bot.wheel!=='band') bot.wheel='band';
@@ -638,7 +657,7 @@ async function G4(){ S.chapter='G4'; S.hintReady=false; S.hintText='How far does
 }
 async function G5(){ S.chapter='G5'; S.hintText=''; hudOff(true);
   cine(true); await camPath([{x:30,y:16,zoom:24,rot:-0.03,d:1.6,ease:'power2.inOut'},{x:16,y:10.5,zoom:30,rot:0,d:1.8,ease:'power3.out'}]); cine(false); $('#dim').classList.add('on');
-  const R0=[{id:'grip',t:'The steeper the rope, the <b>more grip</b> the wheel needs, so a slipping bot needs a grippier wheel or a lighter load.',ok:true},
+  const R0=[{id:'grip',t:'The steeper the rope, the <b>more grip</b> the wheel needs, so a slipping bot needs a grippier wheel.',ok:true},
     {id:'motor',t:'The steeper the rope, the <b>faster</b> the wheel should spin, so a slipping bot needs a stronger motor.'},
     {id:'big',t:'The steeper the rope, the <b>bigger</b> the wheel should be, because a big wheel covers more rope each turn.'}].sort(()=>Math.random()-0.5);
   await titleCard('THE BIG IDEA','SAY THE RULE'); question('Which sentence is true?');
@@ -657,19 +676,19 @@ async function G5(){ S.chapter='G5'; S.hintText=''; hudOff(true);
 }
 /* G5 blueprint: the three towers redrawn as field notes (slope, grip needed, what worked), then the rule word by word.
    Plays after lock-in whatever was chosen. One panel slides (transform); tiles/meters/words are small CSS animations. */
-const GRIP_LINE='The steeper the rope, the more grip the wheel needs, so a slipping bot needs a grippier wheel or a lighter load.';
+const GRIP_LINE='The steeper the rope, the more grip the wheel needs, so a slipping bot needs a grippier wheel.';
 async function blueprint(){
-  const T=[{n:'Tower 1',d:'gentle',h:40,need:1,tw:1,fb:{wheel:'smooth',items:[]}},{n:'Tower 2',d:'steep',h:108,need:2,tw:2,fb:{wheel:'band',items:[]}},{n:'Tower 3',d:'steep + load',h:108,need:3,tw:3,bag:true,fb:{wheel:'band',items:['camera']}}];
+  const T=[{n:'Tower 1',d:'gentle',h:40,need:1,tw:1,fb:{wheel:'smooth',items:[]}},{n:'Tower 2',d:'steep',h:108,need:2,tw:2,fb:{wheel:'band',items:[]}},{n:'Tower 3',d:'steep + load',h:108,need:2,tw:3,bag:true,fb:{wheel:'band',items:['camera']}}];
   // each tile lists that tower's runs from the diary (what was on the bot → what it did); a jump from the menu falls back to the working set-up
   const runsOf=t=>{ const r=S.diary.filter(x=>x.tw===t.tw).slice(-3); return r.length?r:[{dir:'cw',...t.fb,actual:'climbed'}]; };
-  const bag=n=>n>=3?'ui_bag_full':n>=2?'ui_bag_half':'ui_bag_light';
+  const bag=its=>{ const w=loadOf(its); return w>=5?'ui_bag_full':w>PULL?'ui_bag_half':'ui_bag_light'; };
   const bp=html('div',''); bp.id='bp';
   bp.innerHTML=`<div class="bp-eb">YOUR FIELD NOTES · GRIP</div><div class="bp-tiles">${T.map((t,i)=>`<div class="bp-tile" style="--i:${i}">
       <svg viewBox="0 0 320 200" aria-hidden="true"><line class="gnd" x1="6" y1="188" x2="314" y2="188"/><line class="slope" x1="20" y1="182" x2="304" y2="${182-t.h}"/>
         <g class="whl" style="--h:${t.h}"><circle r="15"/><line x1="-15" x2="15"/><line y1="-15" y2="15"/>${t.bag?'<rect x="-11" y="20" width="22" height="18" rx="5"/>':''}</g></svg>
       <div class="bp-n"><b>${t.n}</b> · ${t.d}</div>
       <div class="bp-meter">${[0,1,2].map(k=>`<i class="${k<t.need?'f':''}" style="--k:${k}"></i>`).join('')}${i===0?'<span>grip needed</span>':''}</div>
-      <div class="bp-runs">${runsOf(t).map((r,k)=>`<div class="bp-r ${r.actual==='climbed'?'ok':''}" style="--k:${k}">${img(WICON(r.wheel))}${t.bag?img(bag(r.items.length)):''}<i class="ar"></i>${img(OUTIC[r.actual])}</div>`).join('')}</div></div>`).join('')}</div>
+      <div class="bp-runs">${runsOf(t).map((r,k)=>`<div class="bp-r ${r.actual==='climbed'?'ok':''}" style="--k:${k}">${img(WICON(r.wheel))}${t.bag?img(bag(r.items)):''}<i class="ar"></i>${img(OUTIC[r.actual])}</div>`).join('')}</div></div>`).join('')}</div>
     <div class="bp-rule"><p>${'The steeper the rope, the more grip the wheel needs.'.split(' ').map((w,i)=>`<span style="--w:${i}">${w}</span>`).join(' ')}</p></div>`;
   lastLine=GRIP_LINE; // Replay Narration (sound note) reads the rule
   UI.appendChild(bp); sfx.whoosh(); log('blueprint_shown',{from_diary:S.diary.length});
@@ -687,7 +706,7 @@ async function G6(){ S.chapter='G6'; S.hintReady=false; S.hintText='Check all th
   const tabs={ get items(){ return [{id:'dir',icon:'ui_tab_direction',label:'Turn'},{id:'wheel',icon:'ui_tab_wheel',label:'Wheel'},{id:'load',icon:'ui_tab_load',label:'Load'},{id:'turns',icon:'ui_hdr_turns',label:turnsLabel()}]; }, get active(){ return tab; }, onTab:t=>{ tab=t; build(); } };
   function build(){ const common={tabs};
     if(tab==='dir') tr=tray({...common, options:[{id:'cw',icon:'ui_turn_cw',aria:'Clockwise'},{id:'ccw',icon:'ui_turn_ccw',aria:'Anticlockwise'}], selected:st.dir, onPick:v=>{ st.dir=v; log('setting_changed',{tower:'rope',variable:'dir',to:v}); } });
-    if(tab==='wheel') tr=tray({...common, options:[{id:'smooth',icon:'ui_wheel_smooth',label:'Smooth'},{id:'big_smooth',icon:'ui_wheel_big_smooth',label:'Big smooth'},{id:'band',icon:'ui_wheel_band',label:'Band · 10 cm'},{id:'big_band',icon:'ui_wheel_big_band',label:'Band · 15 cm'}], selected:st.wheel, onPick:async v=>{ st.wheel=v; log('setting_changed',{tower:'rope',variable:'wheel',to:v}); await swapWheel(spare,v); } });
+    if(tab==='wheel') tr=tray({...common, options:[{id:'smooth',icon:'ui_wheel_smooth',label:'Smooth'},{id:'big_smooth',icon:'ui_wheel_big_smooth',label:'Big smooth'},{id:'band',icon:'ui_wheel_band',label:'Band · 10 cm'},{id:'big_band',icon:'ui_wheel_big_band',label:'Band · 15 cm'}], selected:st.wheel, onPick:async v=>{ st.wheel=v; log('setting_changed',{tower:'rope',variable:'wheel',to:v}); speak(WFEEL[v],'w_'+v); await swapWheel(spare,v); } });
     if(tab==='turns') tr=tray({...common, options:[], custom:()=>`<div class="turnsPane"><div class="steplbl">How many turns to the top? (120 cm)</div><div class="stepper"><button class="imgbtn" id="minus" aria-label="Fewer">${img('ui_btn_minus')}</button><div class="val ${pred===null?'unset':''}" id="sv">${pred??'?'}</div><button class="imgbtn" id="plus" aria-label="More">${img('ui_btn_plus')}</button></div></div>`,
       onRender:t=>{ const setv=v=>{ pred=v; const e=t.querySelector('#sv'); e.textContent=v; e.classList.remove('unset'); const tb=t.querySelector('.tab[data-tab="turns"]'); if(tb) tb.lastChild.textContent=turnsLabel(); sfx.tick(); log('setting_changed',{tower:'rope',variable:'turns',to:v}); };
         t.querySelector('#minus').onclick=()=>setv(Math.max(1,(pred??9)-1)); t.querySelector('#plus').onclick=()=>setv(Math.min(99,(pred??7)+1)); } });
@@ -758,7 +777,7 @@ async function G7(){ S.chapter='G7'; S.hintText=''; runState(false); show(H.bann
 const BIG_IDEA='Test it, watch what it does, change one thing.';
 const END_LINE='You tested the bot, watched what it did, and changed one thing at a time, until it reached the top. Test it, watch what it does, change one thing.';
 const LEARNT=[['ui_pulley','A turning wheel moves itself along a still rope.'],['ui_tab_direction','The wheel’s turn sets the way.'],
-  ['ui_wheel_band','Steeper rope, more grip.'],['ui_tab_load','Too much load: the bot stalls.'],['ui_one_turn','1 turn = once around the wheel.']];
+  ['ui_wheel_band','Steeper rope, more grip.'],['ui_tab_load','Too heavy to pull: the bot stops.'],['ui_one_turn','1 turn = once around the wheel.']];
 /* G7 postcard: copy a crop of the live world canvas around the gondola (sky is CSS behind the canvas, so paint it in first).
    A GPU canvas-to-canvas copy, no image encoding. Returns {canvas, x, y} with the gondola's stage position for the FLIP. */
 let postcard=null;
