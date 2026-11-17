@@ -94,10 +94,11 @@ function applySky(){ const m=clamp(S.clock,375,420); let i=0; while(i<SKYK.lengt
   stage.style.setProperty('--cloudA',String(0.35+d*0.4)); world.warm=clamp(1-(m-375)/14,0,1); warmA=m<378?0.10:m<392?0.10+(m-378)/14*0.04:m<406?0.14:Math.max(0.06,0.14-(m-406)/14*0.08); dirty(); }
 
 /* ================= lens ================= */
+const LENS_W=422, LENS_H=226; // the 3D view inside the close-up card (CSS #lens canvas matches)
 const lensEl=$('#lens'); let lens=null; try{ lens=createLens($('#lensCanvas')); }catch(e){ lens=null; } if(!lens) lensEl.classList.add('nogl');
-if(lens) PRELOAD.p.then(()=>setTimeout(()=>{ try{ lens.size(438,274,Math.min(1.5,rscale)); lens.warm(); }catch(e){} },200)); // behind the title, not on the first RUN
+if(lens) PRELOAD.p.then(()=>setTimeout(()=>{ try{ lens.size(LENS_W,LENS_H,Math.min(1.5,rscale)); lens.warm(); }catch(e){} },200)); // behind the title, not on the first RUN
 let lensBot=null;
-function lensShow(mode,name,fallbackImg,feel=''){ lensEl.querySelector('.name').textContent=name||''; lensEl.querySelector('.feel').textContent=feel; lensEl.classList.toggle('hasfeel',!!feel); lensEl.querySelector('.fallback').src=A(fallbackImg||'ui_profile_smooth'); lensEl.classList.add('on'); lensEl.classList.toggle('compact',mode==='idle'); stage.classList.add('lens-on'); if(lens){ lens.size(438,274,Math.min(1.5,rscale)); lens.show(mode); } }
+function lensShow(mode,name,fallbackImg,feel=''){ lensEl.querySelector('.name').textContent=name||''; lensEl.querySelector('.feel').textContent=feel; lensEl.classList.toggle('hasfeel',!!feel); lensEl.querySelector('.fallback').src=A(fallbackImg||'ui_profile_smooth'); lensEl.classList.add('on'); lensEl.classList.toggle('compact',mode==='idle'); stage.classList.add('lens-on'); if(lens){ lens.size(LENS_W,LENS_H,Math.min(1.5,rscale)); lens.show(mode); } }
 function lensHide(){ lensEl.classList.remove('on','slipzoom'); stage.classList.remove('lens-on'); setTimeout(()=>{ if(!lensEl.classList.contains('on')&&lens) lens.hide(); },300); lensBot=null; }
 const WNAME={smooth:'Smooth wheel',big_smooth:'Big smooth wheel',grooved:'Grooved wheel',band:'Grooved + band',big_band:'Big grooved + band'};
 // what each wheel's edge is like, in a child's terms: what it is made of, never what it will do on the slope (spoken on pick, shown in the close-up)
@@ -219,8 +220,11 @@ function caption(text,{next=true,found=null}={}){ lastLine=text; narrate(text); 
 // the sound note's Replay Narration does the same from anywhere.
 async function say(text,opt={}){ const c=caption(text,opt); const nb=c.querySelector('.next'); nudge(nb,{delay:1600}); await click(nb); c.remove(); }
 // voice:false = re-show a step's question after a run without reading it out again
-function question(text,{voice=true}={}){ lastLine=text; if(voice) narrate(text); const old=$('#question'); if(old) old.remove(); const q=html('div','fade'); q.id='question'; q.setAttribute('role','button'); q.setAttribute('aria-label','Read aloud'); q.innerHTML=`<span>${text}</span>`; q.onclick=()=>speak(text); UI.appendChild(q); return q; }
-const rmq=()=>{ const q=$('#question'); if(q) q.remove(); };
+function question(text,{voice=true,dock=false}={}){ lastLine=text; if(voice) narrate(text); const old=$('#question'); if(old) old.remove(); rmDock();
+  const t=dock&&$('#tray'); if(t){ const q=html('div','tq dock'); q.setAttribute('role','button'); q.setAttribute('aria-label','Read aloud'); q.innerHTML=`<span>${text}</span>`; q.onclick=()=>speak(text); t.prepend(q); return q; }
+  const q=html('div','fade'); q.id='question'; q.setAttribute('role','button'); q.setAttribute('aria-label','Read aloud'); q.innerHTML=`<span>${text}</span>`; q.onclick=()=>speak(text); UI.appendChild(q); return q; }
+const rmDock=()=>{ const d=$('#tray > .tq.dock'); if(d) d.remove(); };
+const rmq=()=>{ const q=$('#question'); if(q) q.remove(); rmDock(); };
 
 // projected pins
 const pins=[];
@@ -274,14 +278,15 @@ function armIdleHint(){ clearTimeout(idleT); idleT=0; if(!hintBtn||!runBtn||S.hi
 document.addEventListener('pointerdown',()=>{ if(idleT) armIdleHint(); },{passive:true});
 
 // tray
-function tray({options, selected, multi=false, onPick, tabs, carry, custom, onRender}){ let t=$('#tray'); if(t) t.remove(); t=html('div','fade'); t.id='tray';
+function tray({options, selected, multi=false, onPick, tabs, carry, custom, onRender}){ let t=$('#tray'); const dq=t&&t.querySelector(':scope > .tq.dock'); if(t) t.remove(); t=html('div','fade'); t.id='tray';
   let cur = multi? new Set(selected||[]) : selected;
-  const render=()=>{ t.innerHTML=(tabs?`<div class="tabs">${tabs.items.map(x=>`<button class="tab ${x.id===tabs.active?'on':''}" data-tab="${x.id}" aria-label="${x.label}">${img(x.icon)}${x.id===tabs.active||x.id==='turns'?x.label:''}</button>`).join('')}</div>`:'')+
+  let render=()=>{ t.innerHTML=(tabs?`<div class="tabs">${tabs.items.map(x=>`<button class="tab ${x.id===tabs.active?'on':''}" data-tab="${x.id}" aria-label="${x.label}">${img(x.icon)}${x.id===tabs.active||x.id==='turns'?x.label:''}</button>`).join('')}</div>`:'')+
     (carry?`<div id="carry">${carry}</div>`:'')+
     (custom?custom():`<div class="row">${options.map((o,oi)=>`<button style="--i:${oi}" class="opt ${multi?(cur.has(o.id)?'on':''):(cur===o.id?'on':'')}" data-id="${o.id}" aria-label="${o.aria||o.label||o.id}">${multi?'<span class="chk"></span>':''}${img(o.icon,'main')}${o.badge?img(o.badge,'badge'):''}${o.label?`<span>${o.label}</span>`:''}</button>`).join('')}</div>`);
     t.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{ const id=b.dataset.id; if(multi){ cur.has(id)?cur.delete(id):cur.add(id); } else cur=id; sfx.select(); render(); const nb=t.querySelector(`.opt[data-id="${id}"]`); nb&&nb.classList.add('sweep'); botLook(nb); onPick&&onPick(multi?new Set(cur):cur); });
     t.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{ sfx.tick(); tabs.onTab(b.dataset.tab); }); onRender&&onRender(t); };
-  render(); UI.appendChild(t); return { el:t, get value(){ return cur; }, hide(){ t.classList.add('hide'); }, show(){ t.classList.remove('hide'); }, remove(){ t.remove(); } };
+  const render0=render; render=()=>{ const q=t.querySelector(':scope > .tq.dock'); render0(); if(q) t.prepend(q); }; // the docked question survives a re-render
+  render(); if(dq){ dq.style.animation='none'; t.prepend(dq); } UI.appendChild(t); return { el:t, get value(){ return cur; }, hide(){ t.classList.add('hide'); }, show(){ t.classList.remove('hide'); }, remove(){ t.remove(); } };
 }
 const trayHide=()=>{ const t=$('#tray'); if(t) t.classList.add('hide'); };
 // the bot's eyes glance at whatever was just tapped, then drift back (same reaction for every choice: never a cue)
@@ -487,7 +492,7 @@ async function lookCloser(b){ const back={x:cam.x,y:cam.y,zoom:cam.zoom,rot:cam.
     await camTo({x:w.x,y:w.y+0.02,zoom:620,rot:0},1.7,'power3.in');
     if(lens){ lensEl.querySelector('.name').textContent=WNAME[b.wheel]; lensEl.querySelector('.fallback').src=A(WPROF[b.wheel]);
       lensEl.classList.add('full','on'); lens.size(SW,SH,Math.min(1.25,rscale)); lensBot=b; lens.macro=0; lens.show('contact'); flash(0.5);
-      const corner=`translate(126px,${SH-32-274}px) scale(${438/SW},${274/SH})`; // the small close-up box, in full-stage terms
+      const corner=`translate(146px,${SH-308}px) scale(${LENS_W/SW},${LENS_H/SH})`; // the 3D view inside the small close-up card, in full-stage terms
       const grow=lensEl.animate([{transform:corner},{transform:'none'}],{duration:650,easing:'cubic-bezier(.6,0,.2,1)'}); await P(done=>{ grow.onfinish=done; return ()=>grow.cancel(); });
       gsap.to(lens,{macro:1,duration:2.6,ease:'power2.inOut'});
       await runPhases(b,[PH.climb(b.d+0.45,0.22)]); await wait(700);
@@ -542,7 +547,7 @@ async function towerLoop(tw,getSetup,reopen,{onSuccess,ask,found,fields=['dir','
   let run=0, prev=null; diaryOpen(tw,fields,diaryTop);
   while(true){
     camTo(setupView(),0.9).catch(()=>{});
-    reopen(); show(H.banner,false); maybeSunrise(); if(ask) question(ask,{voice:run===0});
+    reopen(); show(H.banner,false); maybeSunrise(); if(ask) question(ask,{voice:run===0,dock:true});
     await click(runBtn); rmq(); const s=getSetup(); run++;
     const same=prev&&JSON.stringify([s.dir,s.wheel,[...s.items].sort()])===JSON.stringify([prev.dir,prev.wheel,[...prev.items].sort()]);
     log('run_started',{tower:tw,run,setup:{dir:s.dir,wheel:s.wheel,items:[...s.items]},same_as_previous:!!same,anticipated:run===1&&S.changedBeforeFirst});
@@ -717,8 +722,8 @@ async function G6(){ S.chapter='G6'; S.hintReady=false; S.hintText='Check all th
       onRender:t=>{ const setv=v=>{ pred=v; const e=t.querySelector('#sv'); e.textContent=v; e.classList.remove('unset'); const tb=t.querySelector('.tab[data-tab="turns"]'); if(tb) tb.lastChild.textContent=turnsLabel(); sfx.tick(); log('setting_changed',{tower:'rope',variable:'turns',to:v}); };
         t.querySelector('#minus').onclick=()=>setv(Math.max(1,(pred??9)-1)); t.querySelector('#plus').onclick=()=>setv(Math.min(99,(pred??7)+1)); } });
     if(tab==='load') tr=tray({...common, options:ITEMS, multi:true, selected:[...st.items], onPick:v=>{ st.items=v; spare.items=new Set(v); kick(spare,0.2); dirty(); log('setting_changed',{tower:'rope',variable:'load',items:[...v]}); } });
-    stage.classList.add('tray-left'); tr.el.style.left=(tr.el.offsetWidth/2+126)+'px'; } // left-anchored, right of the hint note, so the bot at the rope base stays visible // left-anchored so the bot at the rope base (screen x≈780) stays visible
-  build(); diaryOpen('rope',['dir','wheel','items']); question('Set up the new bot to climb the rope.').classList.add('right'); // right of the rope: keeps the camera mount and the 120 cm line in view; the run diary takes the top-left // left: keeps the camera mount (the target) in view setTimeout(()=>{ const tb=$('#tray .tabs'); tb&&nudge(tb,{delay:200}); },400); // glow only: the tabs carry the same icons as the mission brief
+    stage.classList.add('tray-left'); } // left-anchored, right of the hint note, so the bot at the rope base stays visible // left-anchored so the bot at the rope base (screen x≈780) stays visible
+  build(); diaryOpen('rope',['dir','wheel','items']); question('Set up the new bot to climb the rope.',{dock:true}); // right of the rope: keeps the camera mount and the 120 cm line in view; the run diary takes the top-left // left: keeps the camera mount (the target) in view setTimeout(()=>{ const tb=$('#tray .tabs'); tb&&nudge(tb,{delay:200}); },400); // glow only: the tabs carry the same icons as the mission brief
   let runs=0, success=false, wentGo=false;
   while(runs<2&&!success){
     runState(true,true); if(runs===1){ runBtn.querySelector('.lbl').innerHTML='RUN<br><small style="font-size:16px">1 run left</small>'; }

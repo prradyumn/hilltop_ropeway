@@ -733,3 +733,32 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 #loadcol .lc-lim span{position:absolute;right:calc(100% + 6px);bottom:-15px;white-space:nowrap;background:#fff;color:var(--navy);font:800 16px/1 var(--font);padding:6px 10px;border-radius:999px;box-shadow:0 2px 6px rgba(20,30,60,.18)}
 #loadcol.lim .lc-lim{opacity:1;transform:none}
 @media (prefers-reduced-motion: reduce){ #loadcol .lc-stack i.land{animation:none} #loadcol .lc-lim{transition:none} }
+
+/* 15. Close-up card + question card (clarity pass)
+   Close-up: a framed card like every other SKAI panel. The 3D view sits inside the frame and the wheel's name + what its
+   edge is like read underneath it as a caption, so nothing floats over the picture. View = LENS_W×LENS_H in main.js.
+   Question card: the step's question is the header of the options card (one cream wrapper, like the end card). */
+#lens{height:auto;padding:8px;background:#FFFDF6;border-radius:28px;box-shadow:0 0 0 3px #fff,0 0 0 6px rgba(0,174,239,.28),var(--shadow)}
+#lens canvas{position:relative;display:block;inset:auto;width:422px;height:226px;border-radius:20px;background:linear-gradient(180deg,#DDEBFA,#F6EEDF)}
+#lens img.fallback{left:8px;top:8px;width:422px;height:226px;padding:18px;box-sizing:border-box}
+#lens .cap{display:flex;flex-direction:column;gap:4px;padding:10px 12px 6px}
+#lens .cap .name{position:static;background:none;padding:0;border-radius:0;font:400 24px/1.1 var(--fredoka);color:var(--skaiNavy)}
+#lens .cap .feel{position:static;display:none;background:none;padding:0;border-radius:0;text-align:left;font:800 19px/1.25 var(--font);color:var(--muted);text-wrap:pretty}
+#lens.hasfeel .cap .feel{display:block}
+#lens.full{padding:0;border-radius:0;background:linear-gradient(180deg,#DDEBFA,#F6EEDF);box-shadow:none;height:100%}
+#lens.full canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:0;background:none}
+#lens.full .cap{position:absolute;right:40px;top:100px;padding:9px 16px;background:#fff;border-radius:999px;box-shadow:var(--shadow)}
+#lens.full .cap .name{font-size:22px} #lens.full .cap .feel{display:none}
+#lens{left:138px} /* clear of the hint note and its +2 min badge */
+#lens.on.compact{transform:scale(.84)}
+#lens.compact .cap .name{font-size:29px} #lens.compact .cap .feel{font-size:22px}
+/* choosing with the close-up open: the options card sits right of it instead of centred (never overlaps the card) */
+#stage:has(#lens.on.compact) #tray,#stage.tray-left #tray{left:calc(138px + var(--trayL,0px));transform:none;--tx:0}
+#stage:has(#lens.on.compact) #tray{--trayL:calc(454px * .84 + 24px)}
+#stage:has(#lens.on.compact) #tray.hide,#stage.tray-left #tray.hide{transform:translateY(40px)}
+#tray > .tq.dock{justify-content:center;padding:4px 14px 2px;font:400 30px/1.15 var(--fredoka);color:var(--skaiNavy);animation:tqIn .35s both}
+@keyframes tqIn{from{opacity:0;translate:0 6px}}
+#tray:has(> .tq.dock){padding:20px 18px 18px;gap:14px}
+#tray:has(> .tq.dock) #carry{top:-20px}
+#tray:has(> .tq.dock) .row{position:relative;align-self:center} /* the "tap here" glow rings the choices, not the question */
+#sheet h3{margin:0 0 16px;text-align:center;font:400 30px/1.15 var(--fredoka);color:var(--skaiNavy)} /* same header as the question card */
