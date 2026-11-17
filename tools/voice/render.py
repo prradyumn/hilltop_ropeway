@@ -1,4 +1,5 @@
 # Render the game's read-aloud lines with Kokoro (Apache-2.0, free for commercial use).
+# The shipped voice is now ElevenLabs (render_eleven.py, SKAI voice Vishal-Gr3to5); LINES below stay the single source for both.
 # usage: venv/bin/python render.py <out_dir> [voice] [speed]
 import sys, json, subprocess, os
 import soundfile as sf
@@ -76,11 +77,11 @@ for key, text in LINES.items():
     samples, sr = k.create(text, voice=voice, speed=speed, lang="en-us")
     wav = os.path.join(out, key + ".wav")
     sf.write(wav, samples, sr)
-    mp3 = os.path.join(out, key + ".mp3")
-    # trim leading/trailing silence, gentle loudness normalisation, mono 48 kbps mp3
+    mp3 = os.path.join(out, key + ".ogg")
+    # trim leading/trailing silence, gentle loudness normalisation, mono 24 kbps Opus .ogg
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", wav, "-af",
                     "silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse,loudnorm=I=-16:TP=-1.5:LRA=11",
-                    "-ac", "1", "-ar", "24000", "-b:a", "48k", mp3], check=True)
+                    "-ac", "1", "-c:a", "libopus", "-b:a", "24k", "-application", "voip", mp3], check=True)
     os.remove(wav)
     report[key] = round(len(samples) / sr, 2)
 print(json.dumps({"voice": voice, "speed": speed, "durations": report}))

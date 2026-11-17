@@ -103,6 +103,10 @@ export function createLens(canvas){
   return { size, render, setWheel,
     show(mode){ S.mode=mode; S.visible=true; },
     hide(){ S.visible=false; S.macro=0; },
+    // compile every shader + upload textures once, off-screen, so the first close-up (first RUN) does not freeze for a frame
+    warm(){ const vis=Object.fromEntries(Object.entries(wheels).map(([n,m])=>[n,m.visible])); Object.values(wheels).forEach(m=>m.visible=true); contact.visible=true; pulley.visible=true;
+      try{ layoutContact(); frameCamera(); renderer.compile(scene,cam); renderer.render(scene,cam); }catch(e){}
+      Object.entries(vis).forEach(([n,v])=>wheels[n].visible=v); pulley.visible=false; renderer.clear(); },
     set macro(v){ S.macro=Math.max(0,Math.min(1,v)); }, get macro(){ return S.macro; },
     sync(o){ if(o.wheel&&o.wheel!==S.wheel) setWheel(o.wheel); if(o.angle!==undefined) S.angle=o.angle; if(o.dist!==undefined) S.dist=o.dist; if(o.slope!==undefined) S.slope=o.slope; if(o.slip!==undefined) S.slip=o.slip; },
     get visible(){ return S.visible; }, _S:S };

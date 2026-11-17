@@ -16,7 +16,8 @@ const PRELOAD=(()=>{ const urls=new Set(); [window.ASSETS,window.PACK,window.SPR
   const p=Promise.all([...urls].map(u=>{ const i=new Image(); i.decoding='async'; i.src=u; keep.push(i);
     return (i.decode?i.decode():new Promise((r,j)=>{ i.onload=r; i.onerror=j; })).catch(()=>{}).then(()=>{ n++; }); }));
   return { p, keep, get progress(){ return total?n/total:1; } }; })();
-const START_LABEL='LET’S INVESTIGATE'; // Figma action button 1315:5178
+const START_LABEL='LET’S INVESTIGATE'; // Figma action button 1315:5178 (the title-screen start button)
+const BRIEF_LABEL='LET’S GO'; // same plate on the mission brief, different words so the two screens don't repeat
 const html=(tag,cls,inner='')=>{ const e=document.createElement(tag); if(cls) e.className=cls; if(inner) e.innerHTML=inner; return e; };
 const img=(n,cls='')=>`<img src="${A(n)}" class="${cls}" alt="" draggable="false">`;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)); const lerp=(a,b,t)=>a+(b-a)*t;
@@ -94,6 +95,7 @@ function applySky(){ const m=clamp(S.clock,375,420); let i=0; while(i<SKYK.lengt
 
 /* ================= lens ================= */
 const lensEl=$('#lens'); let lens=null; try{ lens=createLens($('#lensCanvas')); }catch(e){ lens=null; } if(!lens) lensEl.classList.add('nogl');
+if(lens) PRELOAD.p.then(()=>setTimeout(()=>{ try{ lens.size(438,274,Math.min(1.5,rscale)); lens.warm(); }catch(e){} },200)); // behind the title, not on the first RUN
 let lensBot=null;
 function lensShow(mode,name,fallbackImg,feel=''){ lensEl.querySelector('.name').textContent=name||''; lensEl.querySelector('.feel').textContent=feel; lensEl.classList.toggle('hasfeel',!!feel); lensEl.querySelector('.fallback').src=A(fallbackImg||'ui_profile_smooth'); lensEl.classList.add('on'); lensEl.classList.toggle('compact',mode==='idle'); stage.classList.add('lens-on'); if(lens){ lens.size(438,274,Math.min(1.5,rscale)); lens.show(mode); } }
 function lensHide(){ lensEl.classList.remove('on','slipzoom'); stage.classList.remove('lens-on'); setTimeout(()=>{ if(!lensEl.classList.contains('on')&&lens) lens.hide(); },300); lensBot=null; }
@@ -173,7 +175,7 @@ function cloudPass(){ const w=html('div','cpass'); ['cloud_04','cloud_01','cloud
 /* ---------- cloud wipe transition ---------- */
 async function cloudWipe(mid){ const w=html('div','wipe'); ['cloud_01','cloud_05','cloud_03','cloud_06','cloud_02'].forEach((n,i)=>{ const im=new Image(); im.src=(window.PACK&&window.PACK[n])||''; im.className='wc w'+i; w.appendChild(im); }); stage.appendChild(w); sfx.whoosh();
   await wait(20); w.classList.add('in'); await wait(650); try{ mid&&mid(); }catch(e){} dirty(); await wait(250); w.classList.add('out'); await wait(800); w.remove(); }
-/* ---------- read-aloud: recorded lines (Kokoro TTS, assets/voice/<id>.mp3), browser speech as fallback ---------- */
+/* ---------- read-aloud: recorded lines (ElevenLabs, SKAI voice "Vishal-Gr3to5", assets/voice/<id>.ogg, Opus), browser speech as fallback ---------- */
 const VO={'6:15 am. Your class is first in line.':'s1_queue','No ride until the bot checks the cable.':'s1_check','Four towers. Each one steeper.':'s1_towers',
   'This is the inspection bot. It came with a smooth wheel.':'s2_bot','Will it reach the top tower?':'s3_q','Tap the big wheel.':'s4_tapwheel',
   'The wheel turns. The rope moves with it.':'s4_turns','Now tap the bot.':'s4_tapbot','Same kind of wheel. Watch it on the bot.':'s4_same',
@@ -204,11 +206,11 @@ function speak(t,id,{auto=false}={}){ t=t.replace(/<[^>]+>/g,'').trim(); const k
   if(!auto&&lockA) voLock(false); if(isMuted()){ if(lockA) voLock(false); return; } unlock();
   const fallback=()=>{ try{ const u=new SpeechSynthesisUtterance(t); u.rate=0.95; u.onend=()=>mood.duck(false); mood.duck(true); speechSynthesis.speak(u); }catch(e){} };
   if(!key){ fallback(); return; }
-  const a=new Audio(`assets/voice/${key}.mp3`); voEl=a; mood.duck(true); const talk=on=>document.querySelectorAll('#caption .txt,#question,#tray .tq').forEach(e=>e.classList.toggle('talking',on)); talk(true);
+  const a=new Audio(`assets/voice/${key}.ogg`); voEl=a; mood.duck(true); const talk=on=>document.querySelectorAll('#caption .txt,#question,#tray .tq').forEach(e=>e.classList.toggle('talking',on)); talk(true);
   const rel=()=>{ if(lockA===a) voLock(false); };
   if(auto){ lockA=a; voLock(true,14000); a.onloadedmetadata=()=>{ if(lockA===a&&isFinite(a.duration)) voLock(true,(a.duration+1)*1000); }; }
   a.onended=()=>{ talk(false); rel(); if(voEl===a){ voEl=null; mood.duck(false); } }; a.onpause=()=>{ talk(false); rel(); }; a.onerror=()=>{ rel(); if(voEl===a){ voEl=null; fallback(); } };
-  a.play().catch(()=>{ rel(); if(voEl===a){ voEl=null; fallback(); } }); }
+  a.play().catch(()=>{ rel(); if(voEl===a){ voEl=null; fallback(); } }); return a; }
 // found: an icon of what worked at this tower + a FOUND stamp, so the finding is something to look at, not only to read
 function caption(text,{next=true,found=null}={}){ lastLine=text; narrate(text); const old=$('#caption'); if(old) old.remove(); const c=html('div','fade'+(found?' found':'')); c.id='caption';
   c.innerHTML=`<div class="txt" role="button" aria-label="Read aloud">${found?`<span class="fnd"><b>FOUND</b><span class="eq">${img(found[0])}<i></i>${img(found[1])}</span></span>`:''}<span>${text}</span></div>`+(next?`<button class="btn next" aria-label="Next">NEXT</button>`:'');
@@ -251,8 +253,10 @@ function partTag(at,{icon=null,name,line='',r=1,voiceId=null}){ const e=html('di
 /* "meet the part": at the start of a step, the light lands on the one thing the child will change and names it in plain words.
    Names the part only (never which setting to choose). */
 async function meetPart(at,{r=1,icon,name,line,voiceId}){ spotlight(at,{r}); await wait(350); const tp=partTag(at,{icon,name,r}); // name on screen, the sentence is spoken (no narration repeated as text)
-  lastLine=line; if(voiceId&&ac_ok()&&!isMuted()) speak(`${name}. ${line}`,voiceId); sfx.pop();
-  try{ await wait(3300); } finally { unpin(tp); spotOff(); } await wait(300); }
+  lastLine=line; const a=(voiceId&&ac_ok()&&!isMuted())?speak(`${name}. ${line}`,voiceId):null; sfx.pop();
+  try{ await wait(3300); // the light stays until the line is finished (a longer read never gets cut off by the next question)
+    if(a&&voEl===a&&!a.ended) await P(done=>{ const t=setTimeout(done,4000); a.addEventListener('ended',done,{once:true}); a.addEventListener('pause',done,{once:true}); return ()=>clearTimeout(t); });
+  } finally { unpin(tp); spotOff(); } await wait(300); }
 
 // run + hint buttons
 let runBtn, hintBtn;
@@ -359,10 +363,10 @@ async function S1(){ S.chapter='S1';
   // Framed so the summit sits just under the title band; extra width/height on other aspects is just more sky/cloud.
   Object.assign(cam,{x:15.7,y:21.77,zoom:22,rot:0}); // hill fills the frame: station low-left, cable climbing to the summit right; title sits in the empty sky top-left world.bg={zoom:31,y:10.5}; // background layers framed like the wide gameplay view (no flat colour bands)
   applySky(); cine(true); stage.classList.add('nobars','cover'); world.cover=true; dirty();
-  const st=html('div',''); st.id='start'; st.innerHTML=img('ui_title_lockup_2x','title')+`<button class="tapstart" id="startBtn" aria-label="Start">Tap to start</button>`; UI.appendChild(st);
+  const st=html('div',''); st.id='start'; st.innerHTML=img('ui_title_lockup_2x','title')+`<button class="btn start" id="startBtn" aria-label="Start">${START_LABEL}</button>`; UI.appendChild(st);
   const drift=gsap.to(cam,{x:cam.x+1.2,y:cam.y-0.35,duration:18,ease:'sine.inOut',yoyo:true,repeat:-1,onUpdate:()=>{ if(!world.painted) dirty(); }}); // ambient 30 fps redraw picks it up
   { const sb=$('#startBtn'); if(PRELOAD.progress<1){ sb.disabled=true; const lab=()=>{ sb.textContent=`Loading ${Math.round(PRELOAD.progress*100)}%`; }; lab(); const li=setInterval(lab,150);
-      try{ await Promise.race([PRELOAD.p, wait(15000)]); } finally { clearInterval(li); } sb.disabled=false; sb.textContent='Tap to start'; log('preload',{done:Math.round(PRELOAD.progress*100)}); } }
+      try{ await Promise.race([PRELOAD.p, wait(15000)]); } finally { clearInterval(li); } sb.disabled=false; sb.textContent=START_LABEL; log('preload',{done:Math.round(PRELOAD.progress*100)}); } }
   st.classList.add('ready');
   await click(st); unlock(); mood.ambience(true); mood.bed(1); drift.kill(); introOff(); world.cover=false; world.bg=null; stage.classList.remove('nobars','cover'); goFullscreen(true); st.classList.add('leave'); sfx.whoosh(); world.kidsBob=true;
   await wait(500); st.remove();
@@ -387,14 +391,16 @@ async function missionBrief(){ paintTracker(); show(H.tracker,true);
   // mostly pictures: the route (what to get done), three icons (what you fix), one cost line. The voice reads it all.
   m.innerHTML=`<h2>Get the bot to the top by 7:00</h2>${routeHTML(-1,['Top','7:00'])}
     <div class="row2">${fixHTML(['dir','wheel','load'])}<div class="cost">${img('ui_badge_4min')}<span>for each<br>failed run</span></div></div>
-    <div class="ft"><button class="btn" id="briefGo">${START_LABEL}</button></div>`;
+    <div class="ft"><button class="btn" id="briefGo">${BRIEF_LABEL}</button></div>`;
   UI.appendChild(m); lastLine=MISSION_VO; if(ac_ok()) setTimeout(()=>speak(MISSION_VO,'s1_mission'),250);
   // the pieces arrive in step with the voice; the rail and the clock glow when their part is said (attention only)
-  setTimeout(()=>H.tracker.classList.add('attn'),2200);
-  setTimeout(()=>{ H.tracker.classList.remove('attn'); m.classList.add('s2'); },4600);
-  setTimeout(()=>{ m.classList.add('s3'); H.clock.classList.add('attn'); showDue(0); },8200);
-  setTimeout(()=>H.clock.classList.remove('attn'),11000);
-  const go=m.querySelector('#briefGo'); nudge(go,{delay:11500});
+  // beats = sentence starts in assets/voice/s1_mission.ogg (+0.25 s start delay); re-measure with ffmpeg silencedetect if the line is re-recorded
+  const B={towers:3300,fix:6500,clock:10100,clockOff:13600,go:15400};
+  setTimeout(()=>H.tracker.classList.add('attn'),B.towers);
+  setTimeout(()=>{ H.tracker.classList.remove('attn'); m.classList.add('s2'); },B.fix);
+  setTimeout(()=>{ m.classList.add('s3'); H.clock.classList.add('attn'); showDue(0); },B.clock);
+  setTimeout(()=>H.clock.classList.remove('attn'),B.clockOff);
+  const go=m.querySelector('#briefGo'); nudge(go,{delay:B.go});
   try{ await click(go); } finally { H.tracker.classList.remove('attn'); H.clock.classList.remove('attn'); H.clock.classList.remove('duev'); m.remove(); }
   log('mission_brief_read'); }
 // fade the intro video out; the world is drawn again underneath while it fades, then the video stops decoding

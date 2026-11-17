@@ -457,13 +457,13 @@ canvas#world{position:absolute;inset:0;width:100%;height:100%}
 #start{display:block;cursor:pointer}
 #start .title{position:absolute;left:56px;right:auto;margin:0;top:26px;width:900px;max-width:calc(100% - 112px);filter:drop-shadow(0 10px 24px rgba(20,22,46,.35));animation:titleIn 1.1s cubic-bezier(.2,.9,.25,1.15) .2s both,coverBob 6s 1.4s ease-in-out infinite}
 @keyframes coverBob{50%{translate:0 -6px}}
-#start .tapstart{position:absolute;left:506px;top:452px;transform:translateX(-50%);border:0;border-radius:999px;padding:12px 26px;background:rgba(20,22,46,.42);color:#fff;
-  font:400 26px/1 var(--fredoka);letter-spacing:.04em;cursor:pointer;opacity:.0;transition:opacity .6s}
-#start .tapstart[disabled]{opacity:.75;cursor:default;font-size:20px}
-#start.ready .tapstart{opacity:1;animation:tapPulse 2.2s ease-in-out infinite}
-@keyframes tapPulse{50%{opacity:.55}}
-#start.leave .tapstart{animation:fadeOut .3s forwards}
-@media (prefers-reduced-motion: reduce){ #start .title{animation:none} #start.ready .tapstart{animation:none} }
+/* start = Figma action button 1315:5178 "LET'S INVESTIGATE" (453×133 in the 1959 frame → 371×109 on the 1600 stage), centred under the lockup */
+#start .btn.start{position:absolute;left:506px;top:440px;translate:-50% 0;min-width:371px;min-height:109px;padding:0 46px;justify-content:center;font-size:28px;white-space:nowrap;animation:fadeUp .6s .6s both}
+#start .btn.start[disabled]{opacity:.85;filter:none;font-size:22px;cursor:default}
+#start.ready .btn.start{animation:fadeUp .6s .1s both,startPulse 2.4s 1.2s ease-in-out infinite}
+@keyframes startPulse{50%{scale:1.04}}
+#start.leave .btn.start{animation:fadeOut .3s forwards}
+@media (prefers-reduced-motion: reduce){ #start .title{animation:none} #start.ready .btn.start{animation:none} }
 
 /* ---- small polish ---- */
 /* press feedback that survives entrance/bob animations (individual 'scale'/'translate' compose with 'transform') */

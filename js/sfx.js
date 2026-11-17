@@ -9,7 +9,7 @@ const SAMPLES={ tick:['click_001','click_002','click_003','click_004','click_005
 const SGAIN={ tick:0.45, select:0.55, pop:0.55, clack:0.6, bump:0.75, coin:0.5, chime:0.6, tock:0.55, sting:0.6, fanfare:0.7, bright:0.6 };
 const BUF={};
 function loadSamples(){ const names=[...new Set(Object.values(SAMPLES).flat())];
-  names.forEach(n=>fetch(`assets/sfx/${n}.mp3`).then(r=>r.ok?r.arrayBuffer():Promise.reject(r.status)).then(b=>new Promise((res,rej)=>ac.decodeAudioData(b,res,rej))).then(buf=>{ BUF[n]=buf; }).catch(()=>{})); }
+  names.forEach(n=>fetch(`assets/sfx/${n}.ogg`).then(r=>r.ok?r.arrayBuffer():Promise.reject(r.status)).then(b=>new Promise((res,rej)=>ac.decodeAudioData(b,res,rej))).then(buf=>{ BUF[n]=buf; }).catch(()=>{})); }
 let lastPick={};
 function sample(kind,{jitter=0.06,delay=0}={}){ if(!ac||muted) return !!ac; const list=(SAMPLES[kind]||[]).filter(n=>BUF[n]); if(!list.length) return false;
   let n=list[Math.floor(Math.random()*list.length)]; if(list.length>1&&n===lastPick[kind]) n=list[(list.indexOf(n)+1)%list.length]; lastPick[kind]=n; // never the same take twice in a row
