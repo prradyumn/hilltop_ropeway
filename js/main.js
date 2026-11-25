@@ -771,7 +771,7 @@ async function G7(){ S.chapter='G7'; S.hintText=''; runState(false); show(H.bann
     <div><h2>${onTime?'On time. Your class is riding up.':'Your class is riding up.'}</h2>
     <div class="learnt"><b>What you found out</b>${LEARNT.map(([ic,t],i)=>`<div class="ln" style="--i:${i}">${img(ic)}<span>${t}</span></div>`).join('')}</div>
     <div class="big" style="--i:${LEARNT.length}"><b>THE BIG IDEA</b><span>${BIG_IDEA}</span></div>
-    <div class="ft"><button class="btn ghost" id="again">Play again</button><div class="kit"><video class="teaser" muted playsinline preload="auto" poster="assets/video/tarzan_teaser.webp" src="assets/video/tarzan_teaser.mp4" aria-label="Tarzan Bot kit"></video><span>Next class: Tarzan Bot on a real rope.</span></div></div></div>`;
+    <div class="ft"><button class="btn ghost" id="quiz">Quick quiz</button><div class="kit"><video class="teaser" muted playsinline preload="auto" poster="assets/video/tarzan_teaser.webp" src="assets/video/tarzan_teaser.mp4" aria-label="Tarzan Bot kit"></video><span>Next class: Tarzan Bot on a real rope.</span></div></div></div>`;
   UI.appendChild(card); card.querySelector('.pc-photo').appendChild(shot.canvas);
   { const tv=card.querySelector('.teaser'), toImg=()=>{ const i=new Image(); i.src=A('ui_kit_bridge'); i.alt=''; tv.replaceWith(i); }; // teaser plays once, holds its last frame
     tv.onerror=toImg; setTimeout(()=>{ const pr=tv.play(); pr&&pr.catch(toImg); },1200); }
@@ -781,7 +781,7 @@ async function G7(){ S.chapter='G7'; S.hintText=''; runState(false); show(H.bann
   lastLine=END_LINE;
   setTimeout(()=>{ if(card.isConnected) narrate(END_LINE); },1100+LEARNT.length*380+300); // the recap is read once the page is filled in
   if(onTime) sfx.fanfare(); const gpp=gondolaPos(); addFX('vfx_confetti',gpp[0],gpp[1]+1.5,8,{fps:10}); addFX('vfx_arrival_sparkle',gpp[0],gpp[1]+1,5); log('mission_end',{towers:world.lit.filter(Boolean).length+(world.topLit?1:0),points:S.points,on_time:onTime,depart_time:fmt(S.clock)});
-  nudge($('#again'),{delay:3400}); await click($('#again')); play(0);
+  nudge($('#quiz'),{delay:3400}); await click($('#quiz')); log('cfu_open',{}); location.href='cfu.html'; // CFU: 9 questions on this mission's ideas (tools/cfu). Its results link returns to the title = play again
 }
 
 // end-card recap: one line per learning objective the child met (pulley, direction, grip, load, turns)

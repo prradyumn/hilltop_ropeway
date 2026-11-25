@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>__TITLE__</title>
+<!--__HEAD_EXTRA__-->
+<style>
+:root {
+  /* Defaults. build_cfu.py overwrites these with the game's theme. */
+  --bg: #0f1a3d;
+  --surface: #1a2756;
+  --surface-2: #24346b;
+  --text: #f1f4ff;
+  --muted: #aab4dc;
+  --accent: #ffb547;
+  --accent-ink: #1b1300;
+  --correct: #47d79a;
+  --wrong: #ff8a7a;
+  --line: rgba(255,255,255,.16);
+  --radius: 18px;
+  --radius-sm: 12px;
+  --font-display: "Baloo 2", "Trebuchet MS", system-ui, sans-serif;
+  --font-body: "Baloo 2", "Trebuchet MS", system-ui, sans-serif;
+  --bg-image: radial-gradient(1200px 600px at 80% -10%, #2b3f86 0%, transparent 60%);
+  /*__THEME__*/
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); background-image: var(--bg-image); background-attachment: fixed;
+  color: var(--text); font-family: var(--font-body); font-size: 18px; line-height: 1.45;
+  -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+  padding: env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 20px 18px 40px; min-height: 100%; display: flex; flex-direction: column; }
+header.top { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.back { flex: none; text-decoration: none; color: var(--muted); font-size: 15px; padding: 8px 10px; border-radius: 10px; }
+.back:hover { color: var(--text); background: var(--surface); }
+.mission { flex: 1; min-width: 0; }
+.mission h1 { font-family: var(--font-display); font-size: 20px; margin: 0; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mission p { margin: 0; color: var(--muted); font-size: 14px; }
+.dots { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0 0 18px; }
+.dots li { flex: 1; height: 8px; border-radius: 99px; background: var(--surface-2); transition: background .25s; }
+.dots li.now { background: var(--accent); }
+.dots li.ok { background: var(--correct); }
+.dots li.no { background: var(--wrong); }
+.team { background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 15px; color: var(--muted); margin-bottom: 14px; }
+.card { background: var(--surface); border-radius: var(--radius); padding: 22px 20px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; font-size: 14px; color: var(--muted); }
+.chip { background: var(--surface-2); padding: 3px 10px; border-radius: 99px; }
+.prompt { font-family: var(--font-display); font-size: clamp(20px, 4.4vw, 26px); line-height: 1.3; margin: 0 0 6px; font-weight: 700; }
+.hint { color: var(--muted); font-size: 15px; margin: 0 0 16px; }
+/* MCQ */
+.opts { display: grid; gap: 10px; }
+.opt { display: flex; gap: 12px; align-items: center; text-align: left; width: 100%; padding: 14px 16px; border-radius: var(--radius-sm); background: var(--surface-2); border: 2px solid transparent; cursor: pointer; min-height: 56px; transition: border-color .15s, transform .1s; }
+.opt:hover:not(:disabled) { border-color: var(--line); }
+.opt:active:not(:disabled) { transform: scale(.99); }
+.opt .key { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--bg); font-weight: 700; font-size: 15px; }
+.opt[aria-pressed="true"] { border-color: var(--accent); }
+.opt[aria-pressed="true"] .key { background: var(--accent); color: var(--accent-ink); }
+.opt.is-correct { border-color: var(--correct); }
+.opt.is-correct .key { background: var(--correct); color: #06291a; }
+.opt.is-wrong { border-color: var(--wrong); }
+.opt.is-wrong .key { background: var(--wrong); color: #3a0d06; }
+.opt:disabled { cursor: default; }
+/* Match */
+.tray { display: flex; flex-wrap: wrap; gap: 8px; min-height: 52px; padding: 10px; border-radius: var(--radius-sm); background: var(--bg); margin-bottom: 14px; }
+.tray:empty::after { content: "All cards placed"; color: var(--muted); font-size: 14px; align-self: center; padding-left: 4px; }
+.mcard { padding: 10px 14px; border-radius: 10px; background: var(--surface-2); border: 2px solid var(--line); cursor: grab; touch-action: none; user-select: none; font-size: 16px; line-height: 1.25; }
+.mcard.sel { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+.mcard.is-correct { border-color: var(--correct); }
+.mcard.is-wrong { border-color: var(--wrong); }
+.mcard .fix { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+.targets { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.target { border: 2px dashed var(--line); border-radius: var(--radius-sm); padding: 10px; min-height: 92px; cursor: pointer; transition: border-color .15s, background .15s; }
+.target h3 { margin: 0 0 8px; font-size: 16px; font-family: var(--font-display); }
+.target .slot { display: flex; flex-wrap: wrap; gap: 6px; }
+.target.over, .target.armed:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+/* Sequence */
+.seq { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; counter-reset: s; }
+.seq li { counter-increment: s; display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); border: 2px solid transparent; touch-action: none; user-select: none; }
+.seq li::before { content: counter(s); flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--bg); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+.seq li .txt { flex: 1; cursor: grab; }
+.seq li .mv { display: flex; gap: 4px; }
+.seq li .mv button { width: 38px; height: 38px; border-radius: 10px; border: 0; background: var(--bg); cursor: pointer; font-size: 16px; }
+.seq li .mv button:disabled { opacity: .35; cursor: default; }
+.seq li.dragging { opacity: .35; }
+.seq li.is-correct { border-color: var(--correct); }
+.seq li.is-wrong { border-color: var(--wrong); }
+.seq li .should { font-size: 13px; color: var(--muted); }
+.ghost { position: fixed; z-index: 50; pointer-events: none; transform: translate(-50%, -50%) rotate(-2deg); box-shadow: 0 12px 30px rgba(0,0,0,.4); }
+/* Feedback + actions */
+.fb { margin-top: 16px; border-radius: var(--radius-sm); padding: 14px 16px; border-left: 6px solid var(--correct); background: color-mix(in srgb, var(--correct) 12%, var(--surface)); }
+.fb.no { border-left-color: var(--wrong); background: color-mix(in srgb, var(--wrong) 12%, var(--surface)); }
+.fb strong { display: block; font-family: var(--font-display); font-size: 19px; margin-bottom: 2px; }
+.fb p { margin: 0; }
+.actions { display: flex; justify-content: flex-end; margin-top: 18px; }
+.btn { border: 0; border-radius: 99px; padding: 14px 28px; font-weight: 700; font-size: 18px; background: var(--accent); color: var(--accent-ink); cursor: pointer; min-height: 52px; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.ghosty { background: transparent; color: var(--text); border: 2px solid var(--line); }
+/* Results */
+.result h2 { font-family: var(--font-display); font-size: clamp(28px, 7vw, 40px); margin: 0 0 4px; line-height: 1.1; }
+.result .score { color: var(--muted); margin: 0 0 20px; }
+.skills { display: grid; gap: 10px; margin-bottom: 20px; }
+.skill { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface-2); border-radius: var(--radius-sm); }
+.skill .name { flex: 1; font-weight: 700; }
+.skill .marks { display: flex; gap: 5px; }
+.skill .marks span { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+.skill .marks .y { background: var(--correct); color: #06291a; }
+.skill .marks .n { background: var(--wrong); color: #3a0d06; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: no-preference) {
+  .card.enter { animation: rise .35s ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+}
+@media (max-width: 480px) { body { font-size: 17px; } header.top { align-items: flex-start; } .mission h1 { font-size: 18px; } .card { padding: 18px 14px; } .btn { width: 100%; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="back" id="back" href="index.html">← Mission</a>
+    <div class="mission"><h1 id="mTitle"></h1><p id="mSub"></p></div>
+  </header>
+  <ol class="dots" id="dots" aria-hidden="true"></ol>
+  <div id="team"></div>
+  <main id="stage" aria-live="polite"></main>
+</div>
+
+<script id="cfu-data" type="application/json">__CFU_DATA__</script>
+<script>
+(function () {
+  "use strict";
+  var DATA = JSON.parse(document.getElementById("cfu-data").textContent);
+  var M = DATA.mission || {};
+  var QS = DATA.questions || [];
+  var UI = Object.assign({
+    check: "Check answer", next: "Next", finish: "See my results",
+    correct: "That's right!", notQuite: "Not quite.",
+    teamNote: "Talk it over with your team. Then the player whose turn it is answers.",
+    matchHint: "Drag each card to a box, or tap a card and then tap a box.",
+    seqHint: "Drag to reorder, or use the arrows.",
+    resultsTitle: "Mission check complete", back: "Back to mission"
+  }, DATA.ui || {});
+  var KEYS = "ABCDEFG";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var el = function (tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+  function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+  var state = { i: 0, started: new Date().toISOString(), qStart: 0, answers: [], locked: false, current: null };
+
+  document.title = (M.title ? M.title + " · " : "") + "Check your understanding";
+  $("#mTitle").textContent = M.title || "Mission";
+  $("#mSub").textContent = "Check your understanding" + (M.grade ? " · " + M.grade : "");
+  if (M.backHref === null) $("#back").remove(); else if (M.backHref) $("#back").href = M.backHref;
+  $("#back").textContent = "← " + UI.back;
+  if (M.mode === "group") { var t = el("div", "team", UI.teamNote); $("#team").appendChild(t); }
+  var dots = $("#dots");
+  QS.forEach(function () { dots.appendChild(el("li")); });
+
+  function paintDots() {
+    Array.prototype.forEach.call(dots.children, function (d, k) {
+      var a = state.answers[k];
+      d.className = a ? (a.correct ? "ok" : "no") : (k === state.i ? "now" : "");
+    });
+  }
+
+  /* ---------- pointer drag helper (mouse + touch) ---------- */
+  function draggable(node, opts) {
+    var ghost = null, sx = 0, sy = 0, moved = false, overEl = null;
+    node.addEventListener("pointerdown", function (e) {
+      if (state.locked || (opts.handle && !e.target.closest(opts.handle))) return;
+      if (e.button !== undefined && e.button !== 0) return;
+      sx = e.clientX; sy = e.clientY; moved = false;
+      node.setPointerCapture(e.pointerId);
+    });
+    node.addEventListener("pointermove", function (e) {
+      if (!node.hasPointerCapture(e.pointerId)) return;
+      if (!moved && Math.hypot(e.clientX - sx, e.clientY - sy) < 8) return;
+      if (!moved) { moved = true; ghost = node.cloneNode(true); ghost.classList.add("ghost"); ghost.style.width = node.offsetWidth + "px"; document.body.appendChild(ghost); opts.start && opts.start(); }
+      ghost.style.left = e.clientX + "px"; ghost.style.top = e.clientY + "px";
+      var under = document.elementFromPoint(e.clientX, e.clientY);
+      var tgt = under && opts.target(under, e);
+      if (overEl && overEl !== tgt) overEl.classList.remove("over");
+      overEl = tgt; if (tgt) tgt.classList.add("over");
+      opts.move && opts.move(e);
+    });
+    function end(e) {
+      if (!node.hasPointerCapture(e.pointerId)) return;
+      node.releasePointerCapture(e.pointerId);
+      if (overEl) overEl.classList.remove("over");
+      if (moved) { ghost && ghost.remove(); ghost = null; opts.drop(overEl, e); node.dataset.justDragged = "1"; setTimeout(function () { delete node.dataset.justDragged; }, 0); }
+      overEl = null;
+    }
+    node.addEventListener("pointerup", end);
+    node.addEventListener("pointercancel", end);
+  }
+
+  /* ---------- renderers: each returns { ready(), response(), grade(), reveal(ok) } ---------- */
+  function renderMCQ(q, body) {
+    var chosen = null, btns = [];
+    var order = q.options.map(function (_, k) { return k; });
+    if (q.shuffle || DATA.shuffleOptions) order = shuffle(order);
+    var box = el("div", "opts"); box.setAttribute("role", "group");
+    order.forEach(function (k, pos) {
+      var b = el("button", "opt"); b.type = "button"; b.setAttribute("aria-pressed", "false");
+      b.appendChild(el("span", "key", KEYS[pos])); b.appendChild(el("span", "", q.options[k]));
+      b.dataset.k = k;
+      b.addEventListener("click", function () {
+        if (state.locked) return;
+        chosen = k; btns.forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+        api.onChange();
+      });
+      btns.push(b); box.appendChild(b);
+    });
+    body.appendChild(box);
+    return {
+      ready: function () { return chosen !== null; },
+      response: function () { return { option: chosen, text: q.options[chosen] }; },
+      grade: function () { return chosen === q.correct; },
+      setResponse: function (k) { chosen = k; },
+      reveal: function () { btns.forEach(function (b) { b.disabled = true; var k = +b.dataset.k; if (k === q.correct) b.classList.add("is-correct"); else if (k === chosen) b.classList.add("is-wrong"); }); }
+    };
+  }
+
+  function renderMatch(q, body) {
+    body.appendChild(el("p", "hint", UI.matchHint));
+    var tray = el("div", "tray"); body.appendChild(tray);
+    var grid = el("div", "targets"); body.appendChild(grid);
+    var place = {}; var selected = null; var cardEls = {}; var slots = {};
+    q.targets.forEach(function (t) {
+      var box = el("div", "target"); box.dataset.t = t.id; box.setAttribute("role", "button"); box.tabIndex = 0;
+      box.setAttribute("aria-label", "Box: " + t.text);
+      box.appendChild(el("h3", "", t.text)); var s = el("div", "slot"); box.appendChild(s); slots[t.id] = s;
+      function put() { if (selected != null && !state.locked) { move(selected, t.id); } }
+      box.addEventListener("click", function (e) { if (e.target.closest(".mcard")) return; put(); });
+      box.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); put(); } });
+      grid.appendChild(box);
+    });
+    function select(i) { selected = i; Object.keys(cardEls).forEach(function (k) { cardEls[k].classList.toggle("sel", +k === i); }); grid.querySelectorAll(".target").forEach(function (b) { b.classList.toggle("armed", i != null); }); }
+    function move(i, tid) {
+      if (tid) { place[i] = tid; slots[tid].appendChild(cardEls[i]); } else { delete place[i]; tray.appendChild(cardEls[i]); }
+      select(null); api.onChange();
+    }
+    shuffle(q.cards.map(function (_, i) { return i; })).forEach(function (i) {
+      var c = el("button", "mcard", q.cards[i].text); c.type = "button"; c.dataset.i = i; cardEls[i] = c;
+      c.addEventListener("click", function () {
+        if (state.locked || c.dataset.justDragged) return;
+        if (place[i] && selected !== i) { move(i, null); return; }
+        select(selected === i ? null : i);
+      });
+      draggable(c, {
+        target: function (under) { return under.closest(".target") || under.closest(".tray"); },
+        drop: function (tgt) { if (!tgt) return; move(i, tgt.classList.contains("target") ? tgt.dataset.t : null); }
+      });
+      tray.appendChild(c);
+    });
+    return {
+      ready: function () { return Object.keys(place).length === q.cards.length; },
+      response: function () { var r = {}; Object.keys(place).forEach(function (i) { r[q.cards[i].text] = place[i]; }); return r; },
+      grade: function () { return q.cards.every(function (c, i) { return place[i] === c.target; }); },
+      setResponse: function (map) { Object.keys(map).forEach(function (i) { move(+i, map[i]); }); },
+      reveal: function () {
+        var names = {}; q.targets.forEach(function (t) { names[t.id] = t.text; });
+        q.cards.forEach(function (c, i) {
+          var ce = cardEls[i]; ce.disabled = true; ce.style.cursor = "default";
+          if (place[i] === c.target) ce.classList.add("is-correct");
+          else { ce.classList.add("is-wrong"); ce.appendChild(el("span", "fix", "Goes in: " + names[c.target])); }
+        });
+      }
+    };
+  }
+
+  function renderSequence(q, body) {
+    body.appendChild(el("p", "hint", UI.seqHint));
+    var list = el("ol", "seq"); body.appendChild(list);
+    var idx = q.items.map(function (_, i) { return i; });
+    var order; var guard = 0;
+    do { order = shuffle(idx); guard++; } while (guard < 20 && order.every(function (v, k) { return v === k; }));
+    var lis = {};
+    function paint() {
+      order.forEach(function (i, pos) {
+        var li = lis[i]; list.appendChild(li);
+        li.querySelector(".up").disabled = state.locked || pos === 0;
+        li.querySelector(".dn").disabled = state.locked || pos === order.length - 1;
+        li.querySelector(".up").setAttribute("aria-label", "Move up: " + q.items[i]);
+        li.querySelector(".dn").setAttribute("aria-label", "Move down: " + q.items[i]);
+      });
+    }
+    function swap(pos, d) { var p2 = pos + d; if (p2 < 0 || p2 >= order.length) return; var t = order[pos]; order[pos] = order[p2]; order[p2] = t; touched = true; paint(); api.onChange(); }
+    var touched = false;
+    order.forEach(function (i) {
+      var li = el("li"); li.dataset.i = i;
+      li.appendChild(el("span", "txt", q.items[i]));
+      var mv = el("span", "mv");
+      var up = el("button", "up", "▲"); up.type = "button"; var dn = el("button", "dn", "▼"); dn.type = "button";
+      up.addEventListener("click", function () { swap(order.indexOf(i), -1); var b = lis[i].querySelector(".up"); (b.disabled ? lis[i].querySelector(".dn") : b).focus(); });
+      dn.addEventListener("click", function () { swap(order.indexOf(i), 1); var b = lis[i].querySelector(".dn"); (b.disabled ? lis[i].querySelector(".up") : b).focus(); });
+      mv.appendChild(up); mv.appendChild(dn); li.appendChild(mv);
+      lis[i] = li;
+      draggable(li, {
+        handle: ".txt",
+        start: function () { li.classList.add("dragging"); },
+        target: function (under) { var t = under.closest(".seq li"); return t && t !== li ? t : null; },
+        drop: function (tgt, e) {
+          li.classList.remove("dragging");
+          if (!tgt) return;
+          var from = order.indexOf(i); order.splice(from, 1);
+          var to = order.indexOf(+tgt.dataset.i); var r = tgt.getBoundingClientRect();
+          if (e.clientY > r.top + r.height / 2) to++;
+          order.splice(to, 0, i); touched = true; paint(); api.onChange();
+        }
+      });
+    });
+    paint();
+    return {
+      ready: function () { return true; },
+      response: function () { return order.map(function (i) { return q.items[i]; }); },
+      grade: function () { return order.every(function (v, k) { return v === k; }); },
+      setResponse: function (o) { order = o.slice(); paint(); },
+      reveal: function () {
+        paint();
+        order.forEach(function (i, pos) {
+          var li = lis[i]; li.classList.add(i === pos ? "is-correct" : "is-wrong");
+          if (i !== pos) li.querySelector(".txt").appendChild(el("span", "should", " — should be step " + (i + 1)));
+        });
+      }
+    };
+  }
+
+  /* ---------- flow ---------- */
+  var api = { onChange: function () { var b = $("#act"); if (b && !state.locked) b.disabled = !state.current.ready(); } };
+
+  function show() {
+    paintDots();
+    var q = QS[state.i]; state.locked = false; state.qStart = performance.now();
+    var stage = $("#stage"); stage.innerHTML = "";
+    var card = el("section", "card enter"); card.setAttribute("aria-labelledby", "qp");
+    var meta = el("div", "meta");
+    meta.appendChild(el("span", "", "Question " + (state.i + 1) + " of " + QS.length));
+    if (q.skill) meta.appendChild(el("span", "chip", q.skill));
+    card.appendChild(meta);
+    var p = el("h2", "prompt", q.prompt); p.id = "qp"; card.appendChild(p);
+    var body = el("div"); card.appendChild(body);
+    state.current = (q.type === "match" ? renderMatch : q.type === "sequence" ? renderSequence : renderMCQ)(q, body);
+    var fbBox = el("div"); card.appendChild(fbBox);
+    var actions = el("div", "actions");
+    var act = el("button", "btn", UI.check); act.id = "act"; act.type = "button"; act.disabled = !state.current.ready();
+    act.addEventListener("click", function () { state.locked ? advance() : check(fbBox, act); });
+    actions.appendChild(act); card.appendChild(actions);
+    stage.appendChild(card);
+    p.setAttribute("tabindex", "-1"); if (state.i > 0) p.focus({ preventScroll: false });
+  }
+
+  function check(fbBox, act) {
+    var q = QS[state.i], cur = state.current;
+    if (!cur.ready()) return;
+    var ok = cur.grade(); state.locked = true;
+    state.answers[state.i] = {
+      id: q.id || ("q" + (state.i + 1)), skill: q.skill || null, difficulty: q.difficulty || null,
+      type: q.type, transfer: !!q.transfer, correct: ok, response: cur.response(),
+      ms: Math.round(performance.now() - state.qStart)
+    };
+    cur.reveal(ok);
+    var fb = el("div", "fb" + (ok ? "" : " no"));
+    fb.appendChild(el("strong", "", ok ? UI.correct : UI.notQuite));
+    fb.appendChild(el("p", "", q.feedback || ""));
+    fbBox.appendChild(fb);
+    act.textContent = state.i === QS.length - 1 ? UI.finish : UI.next; act.disabled = false; act.focus();
+    paintDots();
+    emit("skai-cfu-answer", state.answers[state.i]);
+  }
+
+  function advance() { state.i++; if (state.i < QS.length) show(); else finish(); }
+
+  function summary() {
+    var bySkill = {};
+    state.answers.forEach(function (a) { var s = a.skill || "General"; bySkill[s] = bySkill[s] || { correct: 0, total: 0 }; bySkill[s].total++; if (a.correct) bySkill[s].correct++; });
+    var c = state.answers.filter(function (a) { return a.correct; }).length;
+    return {
+      missionId: M.id || null, mission: M.title || null, grade: M.grade || null, mode: M.mode || "self",
+      startedAt: state.started, finishedAt: new Date().toISOString(),
+      score: { correct: c, total: QS.length }, bySkill: bySkill, answers: state.answers
+    };
+  }
+
+  function emit(type, payload) {
+    var msg = { type: type, payload: payload };
+    try { if (window.parent && window.parent !== window) window.parent.postMessage(msg, "*"); } catch (e) {}
+    try { if (window.opener) window.opener.postMessage(msg, "*"); } catch (e) {}
+    document.dispatchEvent(new CustomEvent(type, { detail: payload }));
+    try {
+      if (type === "skai-cfu-complete" && typeof window.SKAI_CFU_ON_COMPLETE === "function") window.SKAI_CFU_ON_COMPLETE(payload);
+      if (type === "skai-cfu-answer" && typeof window.SKAI_CFU_ON_ANSWER === "function") window.SKAI_CFU_ON_ANSWER(payload);
+    } catch (e) { console.error(e); }
+  }
+
+  function finish() {
+    paintDots();
+    var s = summary(); window.SKAI_CFU.result = s;
+    var stage = $("#stage"); stage.innerHTML = "";
+    var card = el("section", "card result enter");
+    card.appendChild(el("h2", "", UI.resultsTitle));
+    card.appendChild(el("p", "score", "You got " + s.score.correct + " of " + s.score.total + " right on your first try."));
+    var list = el("div", "skills");
+    var order = []; QS.forEach(function (q) { var k = q.skill || "General"; if (order.indexOf(k) < 0) order.push(k); });
+    order.forEach(function (k) {
+      var row = el("div", "skill"); row.appendChild(el("span", "name", k));
+      var marks = el("span", "marks");
+      state.answers.forEach(function (a) { if ((a.skill || "General") === k) { var m = el("span", a.correct ? "y" : "n", a.correct ? "✓" : "✕"); marks.appendChild(m); } });
+      marks.appendChild(el("span", "sr", s.bySkill[k].correct + " of " + s.bySkill[k].total + " correct"));
+      row.appendChild(marks); list.appendChild(row);
+    });
+    card.appendChild(list);
+    if (M.backHref !== null) {
+      var a = el("div", "actions"); var b = el("a", "btn", UI.back); b.href = M.backHref || "index.html"; b.style.textDecoration = "none"; a.appendChild(b); card.appendChild(a);
+    }
+    stage.appendChild(card);
+    emit("skai-cfu-complete", s);
+  }
+
+  // Small API for testing and for the host game.
+  window.SKAI_CFU = {
+    data: DATA, state: state,
+    answer: function (resp) { if (!state.locked) { state.current.setResponse(resp); $("#act").disabled = false; $("#act").click(); } },
+    next: function () { if (state.locked) $("#act").click(); }
+  };
+  if (!QS.length) { $("#stage").appendChild(el("p", "", "No questions found.")); return; }
+  show();
+})();
+</script>
+</body>
+</html>
