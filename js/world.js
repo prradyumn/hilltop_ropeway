@@ -475,9 +475,17 @@ const MIST=[[-16.4,-2.3,2.6,'cloud_02'],[-13.4,-3.4,3.0,'cloud_05'],[-8.8,-4.9,3
   [12.5,-10.1,3.8,'cloud_04'],[21.5,-10.5,3.8,'cloud_02'],[30.5,-9.1,3.6,'cloud_05'],[38.2,-7.0,3.4,'cloud_03'],[44.2,-4.7,3.0,'cloud_01'],[47.6,-2.4,2.6,'cloud_06']];
 function drawIslandMist(){ const t=world.t; MIST.forEach(([x,y,h,n],i)=>{ const dx=Math.sin(t*0.13+i*1.7)*0.35, dy=Math.sin(t*0.21+i)*0.08;
   pimg(n,x+dx,y+dy,h,0.5,0.5,{alpha:0.94,flip:i%2===1}); }); }
-function drawGrassEdge(){ const im=pk('grass_edge'); if(!im) return; const z=Z(); const xl=world.cam.x-world.W/2/z-1, xr=world.cam.x+world.W/2/z+1; const tile=6, ws=Math.max(0.25,Math.min(0.8,40/z)); const H=0.75*z;
-  for(let x=Math.max(-16.5,Math.floor(xl/ws)*ws); x<Math.min(47.6,xr); x+=ws){ const y0=ground(x), y1=ground(x+ws); const [ax,ay]=toScreen(x,y0), [bx,by]=toScreen(x+ws,y1); const ang=Math.atan2(by-ay,bx-ax), len=Math.hypot(bx-ax,by-ay);
-    const u=((x%tile)+tile)%tile/tile*im.width, uw=ws/tile*im.width; ctx.save(); ctx.translate(ax,ay); ctx.rotate(ang); ctx.drawImage(im,u,0,Math.min(uw,im.width-u),im.height,-0.5,-H*0.58,len+1,H); ctx.restore(); } }
+// grass lip along the hill edge, drawn as short rotated slices of one 6 su tile. Slices are indexed by integer k (x=k·ws,
+// ws=tile/n) so each one maps to an exact 1/n of the image and never straddles the tile wrap: the old float stepping
+// (x+=ws) landed a hair short of x=0,6,12… at most zooms, which cut that slice's source to ~0 px and left a hole in the
+// grass that blinked while the camera zoomed (the station wheel's grey stand showed through at x=0).
+function drawGrassEdge(){ const im=pk('grass_edge'); if(!im) return; const z=Z(); const tile=6, X0=-16.5, X1=47.6;
+  const n=Math.max(8,Math.min(24,Math.round(z*tile/40))), ws=tile/n, uw=im.width/n, H=0.75*z;
+  const xl=Math.max(X0,world.cam.x-world.W/2/z-1), xr=Math.min(X1,world.cam.x+world.W/2/z+1);
+  for(let k=Math.floor(xl/ws); k*ws<xr; k++){ const xa=Math.max(X0,k*ws), xb=Math.min(X1,(k+1)*ws); if(xb<=xa) continue;
+    const u=(((k%n)+n)%n)*uw+(xa-k*ws)/ws*uw, su=(xb-xa)/ws*uw; // partial only at the island tips
+    const [ax,ay]=toScreen(xa,ground(xa)), [bx,by]=toScreen(xb,ground(xb)); const ang=Math.atan2(by-ay,bx-ax), len=Math.hypot(bx-ax,by-ay);
+    ctx.save(); ctx.translate(ax,ay); ctx.rotate(ang); ctx.drawImage(im,u,0,su,im.height,-0.75,-H*0.58,len+1.5,H); ctx.restore(); } }
 const ST={cx:-4.0,w:6.1,h:4.1,y:-0.08}; const stX=r=>ST.cx-ST.w/2+r*ST.w, stY=r=>ST.y+ST.h*(1-r);
 function drawStationPainted(){ const z=Z();
   pimg('prop_lamp_post',-16.25,0.02,2.3,0.5,0.97);
